@@ -10,7 +10,7 @@ Claude Code already has `Ctrl+G`, which opens the prompt in your `$EDITOR`. But 
 
 ## Features
 
-- **Multi-line editor in a pane**, one input field per line. It takes the keyboard as soon as it opens: no mouse needed, so it works in any terminal. The pane grows with the text.
+- **Multi-line editor in a pane.** It takes the keyboard as soon as it opens: no mouse needed, so it works in any terminal. The line you're on is an input field; the other lines stay drawn as text, and moving onto one (arrows, Tab, or a click) lets you edit it. The pane grows with the text.
 - **`@` autocomplete for files and folders:**
   - `@` lists the top level of the project.
   - The suggestions appear as numbered buttons under the line. Press **Tab** to reach them, or **Enter** to take the first one.
@@ -108,7 +108,7 @@ If one of those actions is already in use in your setup, pick another action wit
 | Key | Action |
 | --- | --- |
 | `Enter` | New line below (with `@` suggestions open: take the first one) |
-| `Tab` / `Shift+Tab` | Move between lines, suggestions and buttons |
+| `↑` `↓` / `Tab` / `Shift+Tab` | Move between lines, suggestions and buttons (landing on a line edits it) |
 | `1`–`9` | Take that suggestion (while a suggestion has the focus) |
 | `Ctrl+S` | Send the text to the prompt (needs the keybinding above) |
 | **Apagar linha** button | Delete the current line |
@@ -134,13 +134,13 @@ plugins/rich-input/
 ├── .claude-plugin/plugin.json   manifest and options (shortcutAction, sendAction, showBand)
 ├── hooks/
 │   ├── hooks.json               points Claude Code at register.tsx
-│   ├── register.tsx             /rich command, pane with one Input per line, buttons, @ index, hand-back to the prompt
+│   ├── register.tsx             /rich command, pane (the active line as an Input, the others as rows), buttons, @ index, hand-back to the prompt
 │   └── complete.ts              @ completion: browse by folder, fuzzy search, mention detection
 ├── types/index.d.ts             shared types and the plugin's state contract
 └── tests/rich-input.test.ts     tests (claude plugin test)
 ```
 
-`register.tsx` opens a pane with `$.ui.open` and draws one `Input` per line, kept in the plugin's state. Each change of a line checks whether it ends in an `@` mention. If it does, `register.tsx` draws the suggestions as buttons under that line, from a project index it caches for 15 seconds. On send, `register.tsx` closes the pane and puts the text in the prompt with `$.prompt.fill`.
+`register.tsx` opens a pane with `$.ui.open` and draws the active line as an `Input` and the other lines as rows that make their line active when focused. Each line has a stable id, so its field never passes to another line. The lines are kept in the plugin's state. Each change of a line checks whether it ends in an `@` mention. If it does, `register.tsx` draws the suggestions as buttons under that line, from a project index it caches for 15 seconds. On send, `register.tsx` closes the pane and puts the text in the prompt with `$.prompt.fill`.
 
 ## Development
 

@@ -10,7 +10,7 @@ O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no edi
 
 ## Recursos
 
-- **Editor multi-linha num painel**, com um campo por linha. Ele recebe o teclado assim que abre, sem precisar de mouse, então funciona em qualquer terminal. O painel cresce junto com o texto.
+- **Editor multi-linha num painel.** Ele recebe o teclado assim que abre, sem precisar de mouse, então funciona em qualquer terminal. A linha em que você está é um campo de edição; as outras continuam desenhadas como texto, e ir até uma delas (setas, Tab ou clique) deixa você editá-la. O painel cresce junto com o texto.
 - **Autocomplete de `@` para arquivos e pastas:**
   - `@` lista a raiz do projeto.
   - As sugestões aparecem como botões numerados embaixo da linha. **Tab** chega até elas, ou **Enter** aceita a primeira.
@@ -108,7 +108,7 @@ Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem
 | Tecla | Ação |
 | --- | --- |
 | `Enter` | Linha nova embaixo (com sugestões de `@` abertas: aceita a primeira) |
-| `Tab` / `Shift+Tab` | Anda entre linhas, sugestões e botões |
+| `↑` `↓` / `Tab` / `Shift+Tab` | Anda entre linhas, sugestões e botões (chegar numa linha abre ela para edição) |
 | `1`–`9` | Aceita aquela sugestão (quando o foco está numa sugestão) |
 | `Ctrl+S` | Manda o texto para o prompt (precisa do keybinding acima) |
 | Botão **Apagar linha** | Apaga a linha atual |
@@ -134,13 +134,13 @@ plugins/rich-input/
 ├── .claude-plugin/plugin.json   manifesto e opções (shortcutAction, sendAction, showBand)
 ├── hooks/
 │   ├── hooks.json               aponta o Claude Code para o register.tsx
-│   ├── register.tsx             comando /rich, painel com um Input por linha, botões, índice do @, devolução ao prompt
+│   ├── register.tsx             comando /rich, painel (a linha ativa como Input, as outras como linhas de texto), botões, índice do @, devolução ao prompt
 │   └── complete.ts              autocomplete do @: navegação por pasta, busca aproximada, detecção de menção
 ├── types/index.d.ts             tipos compartilhados e o contrato de estado do plugin
 └── tests/rich-input.test.ts     testes (claude plugin test)
 ```
 
-O `register.tsx` abre um painel com `$.ui.open` e desenha um `Input` por linha, guardando as linhas no estado do plugin. A cada mudança numa linha, ele verifica se ela termina numa menção `@`. Se terminar, desenha as sugestões como botões embaixo dessa linha, a partir de um índice do projeto que ele guarda por 15 segundos. Ao enviar, o `register.tsx` fecha o painel e põe o texto no prompt com `$.prompt.fill`.
+O `register.tsx` abre um painel com `$.ui.open` e desenha a linha ativa como um `Input` e as outras como linhas que viram a ativa quando recebem o foco. Cada linha tem um id fixo, então o campo dela nunca passa para outra linha. As linhas ficam guardadas no estado do plugin. A cada mudança numa linha, ele verifica se ela termina numa menção `@`. Se terminar, desenha as sugestões como botões embaixo dessa linha, a partir de um índice do projeto que ele guarda por 15 segundos. Ao enviar, o `register.tsx` fecha o painel e põe o texto no prompt com `$.prompt.fill`.
 
 ## Desenvolvimento
 
