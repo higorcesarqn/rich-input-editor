@@ -10,21 +10,21 @@ O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no edi
 
 ## Recursos
 
-- **Editor multi-linha** num painel, com quebra automática de linha, indicador de linha e coluna e suporte a mouse (clique posiciona o cursor, arrastar seleciona).
+- **Editor multi-linha num painel**, com um campo por linha. Ele recebe o teclado assim que abre, sem precisar de mouse, então funciona em qualquer terminal.
 - **Autocomplete de `@` para arquivos e pastas:**
   - `@` lista a raiz do projeto.
-  - Ao aceitar uma pasta, o menu continua aberto com o conteúdo dela (`@src/` → `@src/lib/` → arquivo).
+  - As sugestões aparecem como botões numerados embaixo da linha. **Tab** chega até elas, ou **Enter** aceita a primeira.
+  - Ao aceitar uma pasta, o conteúdo dela aparece na hora (`@src/` → `@src/lib/` → arquivo).
   - Digitar só um nome (`@parse`) busca no projeto inteiro.
   - Usa `git ls-files`, então respeita o `.gitignore`. Fora de um repositório git, percorre as pastas (até 5.000 itens, sem `node_modules`, `dist` etc.).
   - Caminhos com espaço ficam entre aspas (`@"docs/minhas notas.md"`), como o prompt nativo faz.
-- **Teclas de edição:** navegação por palavra (`Ctrl/Alt+←/→`), seleção (`Shift+setas`, `Ctrl+A`), desfazer e refazer (`Ctrl+Z`/`Ctrl+Y`), e `Ctrl+W`/`Ctrl+U`/`Ctrl+K`.
+- **Colar** um texto com várias linhas divide o texto em linhas.
 - **Você nunca perde o rascunho:** o que estava no prompt vai para o editor quando ele abre. Fechar o editor (`Esc`, botão de fechar, Cancelar) devolve o rascunho ao prompt.
 - **Abre de três jeitos:** um atalho de teclado, o comando `/rich` ou o botão **✎ Rich input** acima do prompt.
 
 ## Requisitos
 
 - Claude Code **2.1.289 ou mais novo**. O plugin usa a API de *function hooks* do Claude Code (módulos de hooks em TypeScript com painéis de UI). Essa API está em **acesso antecipado** e pode mudar entre versões.
-- Um terminal que repasse cliques do mouse para o Claude Code. Você clica no editor para digitar nele (veja [Limitações conhecidas](#limitações-conhecidas)).
 
 ## Instalação
 
@@ -64,11 +64,14 @@ claude plugin marketplace add ./rich-input-editor
 claude plugin install rich-input@rich-input-editor
 ```
 
-## Atalho de teclado
+## Atalhos de teclado
 
-Plugins não podem registrar uma tecla própria. Em vez disso, o botão **✎ Rich input** escuta uma *ação* de keybinding do Claude Code, e você liga uma tecla a essa ação. Por padrão a ação é `app:toggleReplTab`.
+Plugins não podem registrar teclas próprias. Em vez disso, os botões do plugin escutam *ações* de keybinding do Claude Code, e você liga teclas a essas ações:
 
-Para abrir o editor com **Alt+R**, coloque isto no `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
+- o botão **✎ Rich input** (abre o editor) escuta `app:toggleReplTab`;
+- o botão **Enviar ao prompt** (manda o texto) escuta `app:toggleDiffPreSession`.
+
+Para abrir o editor com **Alt+R** e enviar com **Ctrl+S**, coloque isto no `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
 
 ```json
 {
@@ -80,38 +83,35 @@ Para abrir o editor com **Alt+R**, coloque isto no `~/.claude/keybindings.json` 
       "bindings": {
         "alt+r": "app:toggleReplTab"
       }
+    },
+    {
+      "context": "PaneField",
+      "bindings": {
+        "ctrl+s": "app:toggleDiffPreSession"
+      }
     }
   ]
 }
 ```
 
-Se o `app:toggleReplTab` já tiver uso no seu ambiente, escolha outra ação sem uso e coloque-a na opção `shortcutAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho só funciona enquanto a linha do botão acima do prompt estiver visível (opção `showBand`, ligada por padrão).
+Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem uso e coloque-a na opção `shortcutAction` ou `sendAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho de abrir só funciona enquanto a linha do botão acima do prompt estiver visível (opção `showBand`, ligada por padrão). Sem os atalhos, você ainda pode usar o `/rich` e chegar ao botão **Enviar ao prompt** com **Tab**.
 
 ## Uso
 
 1. Abra o editor: **Alt+R**, `/rich` ou o botão **✎ Rich input**. `/rich algum texto` abre o editor já com esse texto.
-2. **Clique na área de texto** para ela receber o teclado.
-3. Escreva. Digite `@` para mencionar arquivos e pastas.
-4. Aperte **Ctrl+S** (ou o botão **Enviar ao prompt**). O editor fecha e o texto vai para o prompt do Claude Code.
-5. Aperte **Enter** para enviar.
+2. Escreva. **Enter** abre uma linha nova embaixo. Digite `@` para mencionar arquivos e pastas.
+3. Aperte **Ctrl+S** (ou vá com Tab até **Enviar ao prompt** e aperte Enter). O editor fecha e o texto vai para o prompt do Claude Code.
+4. Aperte **Enter** para enviar.
 
 ### Teclas
 
 | Tecla | Ação |
 | --- | --- |
-| `Enter` / `Ctrl+J` | Nova linha |
-| `Ctrl+S` / `Ctrl+Enter` | Manda o texto para o prompt |
-| `@` | Abre o autocomplete de arquivos e pastas |
-| `↑` `↓` | Escolhe a sugestão (com o menu aberto) |
-| `Tab` / `Enter` | Aceita a sugestão (com o menu aberto) |
-| `←` `→` `↑` `↓` `Home` `End` `PgUp` `PgDn` | Move o cursor |
-| `Ctrl+←/→`, `Alt+B`/`Alt+F` | Move por palavra |
-| `Shift` + movimento | Seleciona |
-| `Ctrl+A` | Seleciona tudo |
-| `Backspace` / `Delete` (`Ctrl/Alt+` apaga a palavra) | Apaga |
-| `Ctrl+W` / `Ctrl+U` / `Ctrl+K` | Apaga a palavra anterior / até o início da linha / até o fim da linha |
-| `Ctrl+Z` / `Ctrl+Y` | Desfaz / refaz |
-| `Ctrl+Q` | Cancela (o rascunho volta ao prompt) |
+| `Enter` | Linha nova embaixo (com sugestões de `@` abertas: aceita a primeira) |
+| `Tab` / `Shift+Tab` | Anda entre linhas, sugestões e botões |
+| `1`–`9` | Aceita aquela sugestão (quando o foco está numa sugestão) |
+| `Ctrl+S` | Manda o texto para o prompt (precisa do keybinding acima) |
+| Botão **Apagar linha** | Apaga a linha atual |
 | `Esc` | Sai do editor (o rascunho volta ao prompt) |
 
 ### Por que "enviar" põe o texto no prompt em vez de mandar direto
@@ -120,28 +120,27 @@ O Claude Code não expande menções `@arquivo` num prompt enviado por um plugin
 
 ## Limitações conhecidas
 
-- **É preciso clicar no editor antes de digitar.** O Claude Code só manda teclas para a área de edição de um plugin depois de um clique nela. Se o seu terminal não repassar eventos de mouse, o editor não recebe teclas.
-- O **Tab** pode mover o foco entre os botões do painel antes de chegar ao editor. Se acontecer, aceite as sugestões com **Enter**.
-- O **Ctrl+C** (copiar a seleção) pode ser capturado pelo próprio Claude Code. Colar pelo terminal funciona.
+- **Enter sempre abre a linha nova *embaixo*.** O plugin não sabe onde está o cursor dentro da linha, então não consegue dividir uma linha em duas.
+- **Para apagar uma linha, use o botão "Apagar linha".** Backspace numa linha vazia não apaga a linha.
+- **As sugestões consideram que você digita no fim da linha.** Uma menção `@` no meio da linha é completada a partir do fim da linha.
 - **Sem anexar imagens.** Depois de mandar o texto para o prompt nativo, cole as imagens lá (`Ctrl+V` / `Alt+V`).
 - Os textos da interface do editor (botões, dicas) estão em português.
+- O painel abre **acima** do prompt (ou ao lado da conversa, no fullscreen). O Claude Code não deixa plugins colocarem painel embaixo do prompt.
 
 ## Como funciona
 
 ```
 plugins/rich-input/
-├── .claude-plugin/plugin.json   manifesto e opções (shortcutAction, showBand)
+├── .claude-plugin/plugin.json   manifesto e opções (shortcutAction, sendAction, showBand)
 ├── hooks/
 │   ├── hooks.json               aponta o Claude Code para o register.tsx
-│   ├── register.tsx             comando /rich, painel, botão do atalho, índice do @, devolução ao prompt
-│   ├── editor.tsx               o editor (módulo de superfície Client: teclas, mouse, desenho)
-│   ├── buffer.ts                modelo de texto: cursor, seleção, quebra de linha, detecção de @
-│   └── complete.ts              autocomplete do @: navegação por pasta, busca aproximada
+│   ├── register.tsx             comando /rich, painel com um Input por linha, botões, índice do @, devolução ao prompt
+│   └── complete.ts              autocomplete do @: navegação por pasta, busca aproximada, detecção de menção
 ├── types/index.d.ts             tipos compartilhados e o contrato de estado do plugin
 └── tests/rich-input.test.ts     testes (claude plugin test)
 ```
 
-O `register.tsx` abre um painel com `$.ui.open` e desenha um `Client` que roda o `editor.tsx`. O editor manda cada edição, junto com a consulta `@` sob o cursor, para o `register.tsx`. O `register.tsx` responde com sugestões de um índice do projeto que ele guarda por 15 segundos. Ao enviar, o `register.tsx` fecha o painel e põe o texto no prompt com `$.prompt.fill`.
+O `register.tsx` abre um painel com `$.ui.open` e desenha um `Input` por linha, guardando as linhas no estado do plugin. A cada mudança numa linha, ele verifica se ela termina numa menção `@`. Se terminar, desenha as sugestões como botões embaixo dessa linha, a partir de um índice do projeto que ele guarda por 15 segundos. Ao enviar, o `register.tsx` fecha o painel e põe o texto no prompt com `$.prompt.fill`.
 
 ## Desenvolvimento
 

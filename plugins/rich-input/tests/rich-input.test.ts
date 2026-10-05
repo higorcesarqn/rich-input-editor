@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { On } from 'claude-code'
 
-import { at, insert, layout, mentionAt, offsetAt, rowOf, vertical, wordLeft } from '../hooks/buffer'
-import { complete, withDirs } from '../hooks/complete'
+import { complete, mentionAt, withDirs } from '../hooks/complete'
 
 const FILES = ['src/app.ts', 'src/lib/parse.ts', 'src/lib/print.ts', 'docs/my notes.md', 'README.md']
 const ENTRIES = withDirs(FILES)
@@ -30,20 +30,6 @@ test('the mention under the cursor, and none mid-word', () => {
   expect(mentionAt('@x y', 4)).toBeNull()
 })
 
-test('rows wrap long lines and the cursor moves between them', () => {
-  const rows = layout('abcdef\nxy', 4)
-  expect(rows).toEqual([
-    { start: 0, end: 4 },
-    { start: 4, end: 6 },
-    { start: 7, end: 9 },
-  ])
-  expect(rowOf(rows, 4)).toBe(1)
-  expect(vertical(rows, 1, 2, 1)).toBe(8)
-  expect(offsetAt(rows, 2, 99)).toBe(9)
-  expect(wordLeft('foo bar', 7)).toBe(4)
-  expect(insert({ text: 'abc', cursor: 3, anchor: 0 }, 'z')).toEqual(at('z'))
-})
-
 const PANE = {
   plugin: 'rich-input',
   surface: 'terminal',
@@ -60,9 +46,8 @@ const PANE = {
   viewport: { columns: 80, rows: 30 },
 } as const
 
-test('@ completes folder by folder and Ctrl+S hands the text to the prompt box', async ($, on) => {
+function engine(on: On, filled: string[]) {
   mock.clock(on)
-  const filled: string[] = []
   on('session.cwd', () => ({ value: '/proj' }))
   on('process.run', () => ({
     value: { exitCode: 0, stdout: FILES.join('\0'), stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
@@ -73,22 +58,51 @@ test('@ completes folder by folder and Ctrl+S hands the text to the prompt box',
   })
   on('ui.close', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
+}
 
+test('@ completes folder by folder, Enter opens a line, Send hands the text to the prompt', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
   const ui = await $.ui.mount(PANE)
-  await ui.resize({ columns: 60, rows: 11 })
-  for (const key of 'Fix ') await ui.key({ key })
-  await ui.key({ key: '@' })
-  expect(await ui.find({ in: 'editor', text: 'src/' })).toBeDefined()
 
-  await ui.key({ key: 'down' })
-  await ui.key({ key: 'tab' })
-  expect(await ui.find({ in: 'editor', text: 'src/lib/' })).toBeDefined()
+  await ui.input({ key: 'line:0', text: 'Fix @', kind: 'change' })
+  expect((await ui.findAll({ type: 'Button', text: /\/$/ })).map(b => b.text)).toEqual(['docs/', 'src/'])
 
-  await ui.key({ key: 'tab' })
-  await ui.key({ key: 'tab' })
-  await ui.key({ key: 'return' })
-  for (const key of 'ok') await ui.key({ key })
-  await ui.key({ key: 's', ctrl: true })
+  await ui.press({ key: 'sug:1' })
+  expect(await ui.find({ key: 'sug:0', text: 'src/lib/' })).toBeDefined()
+
+  await ui.press({ key: 'sug:0' })
+  await ui.press({ key: 'sug:0' })
+  expect((await ui.find({ key: 'line:0' }))?.text).toBe('Fix @src/lib/parse.ts ')
+  expect(await ui.find({ key: 'sug:0' })).toBeUndefined()
+
+  await ui.input({ key: 'line:0', text: 'Fix @src/lib/parse.ts ' })
+  await ui.input({ key: 'line:1', text: 'ok', kind: 'change' })
+  await ui.press({ key: 'send' })
 
   expect(filled).toEqual(['Fix @src/lib/parse.ts \nok'])
+})
+
+test('Enter on a line with completions open takes the first one', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  const ui = await $.ui.mount(PANE)
+
+  await ui.input({ key: 'line:0', text: 'see @pri', kind: 'change' })
+  await ui.input({ key: 'line:0', text: 'see @pri' })
+  expect((await ui.find({ key: 'line:0' }))?.text).toBe('see @src/lib/print.ts ')
+  expect(await ui.find({ key: 'line:1' })).toBeUndefined()
+})
+
+test('a pasted text with newlines becomes several lines', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  const ui = await $.ui.mount(PANE)
+
+  await ui.input({ key: 'line:0', text: 'one\ntwo\nthree', kind: 'change' })
+  expect((await ui.find({ key: 'line:2' }))?.text).toBe('three')
+
+  await ui.press({ key: 'delete-line' })
+  await ui.press({ key: 'send' })
+  expect(filled).toEqual(['one\ntwo'])
 })

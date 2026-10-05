@@ -1,23 +1,26 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { EditorMessage, EditorProps, Seed } from '../types'
-import { complete, type Entry, withDirs } from './complete'
+import type { Doc, Suggestion } from '../types'
+import { complete, type Entry, mentionAt, withDirs } from './complete'
 
 const PANE = 'rich-input'
-const seed = atom({ plugin: 'rich-input', key: 'seed' } as const, { text: '', nonce: 0 } as Seed)
-const draft = atom({ plugin: 'rich-input', key: 'draft' } as const, '')
+const EMPTY: Doc = { lines: [''], active: 0, sug: null }
+const doc = atom({ plugin: 'rich-input', key: 'doc' } as const, EMPTY)
 
 /** Folders the fallback walk skips: build output and dependencies. */
 const SKIPPED = new Set(['.git', 'node_modules', 'dist', 'build', 'out', 'target', '.next', '.venv', 'venv', '__pycache__', '.cache'])
 const WALK_LIMIT = 5000
 const INDEX_TTL_MS = 15_000
+const MENU_SIZE = 9
 
 type $ = EngineInterface
 
 let index: { root: string; at: number; entries: Entry[] } | null = null
-let lastQuery: string | null = null
 let isSending = false
+
+const lineKey = (i: number) => `line:${i}`
+const textOf = (d: Doc) => d.lines.join('\n').replace(/\n+$/, '')
 
 /** The project's files and folders: git's list, else a bounded walk. */
 async function entries($: $): Promise<Entry[]> {
@@ -66,10 +69,12 @@ async function walk($: $, root: string): Promise<string[]> {
   return files
 }
 
-async function editorProps($: $, query: string | null): Promise<EditorProps> {
-  const { text, nonce } = await read($, seed)
-  const suggestions = query === null ? [] : complete(await entries($), query)
-  return { text, nonce, sugQuery: query, suggestions }
+/** The completions for the mention a line ends in, or null outside one. */
+async function suggestionsFor($: $, line: number, text: string): Promise<Doc['sug']> {
+  const m = mentionAt(text, text.length)
+  if (m === null) return null
+  const items = complete(await entries($), m.query)
+  return items.length === 0 ? null : { line, query: m.query, items }
 }
 
 /** Opens the editor with what the prompt box holds, moving it out of the box. */
@@ -77,29 +82,94 @@ async function openEditor($: $, extra = '') {
   const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
   if (!isOpen) {
     const box = await $.prompt.read()
-    const text = [box.text, extra].filter(t => t !== '').join(box.text.endsWith('\n') ? '' : ' ')
-    await update($, seed, s => ({ text, nonce: (s?.nonce ?? 0) + 1 }))
-    await update($, draft, () => text)
-    lastQuery = null
+    const text = [box.text, extra].filter(t => t !== '').join(' ')
+    const lines = text === '' ? [''] : text.split(/\r?\n/)
+    await update($, doc, () => ({ lines, active: lines.length - 1, sug: null }))
     // The pane takes the keyboard only over an empty composer.
     if (box.text !== '') await $.prompt.fill({ text: '', mode: 'replace' })
   }
-  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, rows: 16 })
+  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, closeOnEscape: true, rows: 16 })
   void entries($).catch(() => undefined)
 }
 
+/** Closes the editor; with a text, puts it in the prompt box to be sent. */
 async function closeEditor($: $, text: string | null) {
   isSending = text !== null
   await $.ui.close({ id: PANE })
   isSending = false
   if (text === null) return
-  await update($, draft, () => '')
+  await update($, doc, () => EMPTY)
   const filled = await $.prompt.fill({ text, mode: 'replace' })
   if (filled.isFilled) $.ui.toast('Prompt no campo: Enter envia (as @referências são resolvidas no envio)')
 }
 
+async function send($: $) {
+  await closeEditor($, textOf(await read($, doc)))
+}
+
+/** Moves the keyboard to one of the pane's elements; a refused move keeps it. */
+async function focus($: $, key: string) {
+  try {
+    await $.ui.focus({ requestId: PANE, key })
+  } catch {
+    // The ring stays where it was: the edit itself has landed.
+  }
+}
+
+/** A line's text changed: a paste with newlines splits it into several. */
+async function changeLine($: $, i: number, value: string) {
+  const parts = value.split(/\r?\n/)
+  const last = i + parts.length - 1
+  const sug = await suggestionsFor($, last, parts[parts.length - 1]!)
+  await update($, doc, d => {
+    const lines = [...d.lines]
+    lines.splice(i, 1, ...parts)
+    return { lines, active: last, sug }
+  })
+  if (parts.length > 1) await focus($, lineKey(last))
+}
+
+/** Enter on a line: takes the first completion, or opens a new line below. */
+async function submitLine($: $, i: number, value: string) {
+  const d = await read($, doc)
+  if (d.sug !== null && d.sug.line === i) return accept($, i, d.sug.items[0]!)
+  await update($, doc, cur => {
+    const lines = [...cur.lines]
+    lines[i] = value
+    lines.splice(i + 1, 0, '')
+    return { lines, active: i + 1, sug: null }
+  })
+  await focus($, lineKey(i + 1))
+}
+
+/** Puts a completion in place of the line's `@query`; a folder opens its own. */
+async function accept($: $, i: number, choice: Suggestion) {
+  const d = await read($, doc)
+  const line = d.lines[i] ?? ''
+  const m = mentionAt(line, line.length)
+  if (m === null) return
+  const next = line.slice(0, m.start) + choice.insert + (choice.isDir ? '' : ' ') + line.slice(m.end)
+  const sug = choice.isDir ? await suggestionsFor($, i, next) : null
+  await update($, doc, cur => {
+    const lines = [...cur.lines]
+    lines[i] = next
+    return { lines, active: i, sug }
+  })
+  await focus($, sug !== null ? 'sug:0' : lineKey(i))
+}
+
+async function deleteLine($: $) {
+  const d = await read($, doc)
+  const at = Math.min(d.active, d.lines.length - 1)
+  const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : ['']
+  const active = Math.max(0, at - 1)
+  await update($, doc, () => ({ lines, active, sug: null }))
+  await focus($, lineKey(active))
+}
+
 export const register: Register = (on, options) => {
-  const action = typeof options.shortcutAction === 'string' ? options.shortcutAction : 'app:toggleReplTab'
+  const openAction = typeof options.shortcutAction === 'string' ? options.shortcutAction : 'app:toggleReplTab'
+  const sendAction = typeof options.sendAction === 'string' ? options.sendAction : 'app:toggleDiffPreSession'
   const showBand = options.showBand !== false
 
   on('session.start', async ($, e, next) => {
@@ -121,7 +191,7 @@ export const register: Register = (on, options) => {
     const { Box, Button, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="row">
-        <Button key="open-rich" label="✎ Rich input" plain dimColor action={action} onPress={() => openEditor($)} />
+        <Button key="open-rich" label="✎ Rich input" plain dimColor action={openAction} onPress={() => openEditor($)} />
         <Text dimColor> Alt+R ou /rich</Text>
       </Box>
     )
@@ -130,51 +200,67 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
-    const props = await editorProps($, null)
-    const height = Math.max(4, e.props.scroll.bodyRows - 1)
-    const editor =
-      'Client' in ui ? (
-        <ui.Client key="editor" module="./editor.tsx" props={props} width={e.props.bodyColumns} height={height} />
-      ) : (
-        <Text>Este ambiente não desenha o editor; use o prompt.</Text>
+    if (!('Input' in ui)) return <Text>Este ambiente não desenha o editor; use o prompt.</Text>
+
+    const d = await read($, doc)
+    const width = String(d.lines.length).length
+    const rows = []
+    for (let i = 0; i < d.lines.length; i++) {
+      const isMenu = d.sug !== null && d.sug.line === i
+      rows.push(
+        <ui.Input
+          key={lineKey(i)}
+          label={`${String(i + 1).padStart(width)} │`}
+          value={d.lines[i]}
+          placeholder={d.lines.length === 1 ? 'Escreva o prompt… @ referencia arquivos e pastas' : undefined}
+          submitLabel={isMenu ? 'aceitar' : 'nova linha'}
+          autoFocus={i === d.active ? true : undefined}
+          onInput={value => changeLine($, i, value)}
+          onSubmit={value => submitLine($, i, value)}
+        />,
       )
+      if (isMenu) {
+        d.sug!.items.slice(0, MENU_SIZE).forEach((choice, j) =>
+          rows.push(
+            <Box paddingLeft={width + 2}>
+              <Button
+                key={`sug:${j}`}
+                plain
+                hotkey={String(j + 1)}
+                dimColor={!choice.isDir}
+                label={choice.label}
+                onPress={() => accept($, i, choice)}
+              />
+            </Box>,
+          ),
+        )
+      }
+    }
+
     return (
       <Box flexDirection="column">
-        {editor}
-        <Box flexDirection="row">
-          <Button key="send" label="Enviar ao prompt" variant="primary" onPress={async () => closeEditor($, await read($, draft))} />
+        {rows}
+        <Box flexDirection="row" marginTop={1}>
+          <Button key="send" label="Enviar ao prompt" variant="primary" action={sendAction} onPress={() => send($)} />
+          <Text> </Text>
+          <Button key="delete-line" label="Apagar linha" onPress={() => deleteLine($)} />
           <Text> </Text>
           <Button key="cancel" label="Cancelar" role="dismiss" onPress={() => closeEditor($, null)} />
-          <Text dimColor> clique no texto para editar</Text>
         </Box>
+        <Text dimColor wrap="truncate-end">
+          Enter nova linha · Tab vai às sugestões do @ · Ctrl+S envia · Esc sai (o texto volta ao prompt)
+        </Text>
       </Box>
     )
   })
 
-  on('ui.message', async ($, e, next) => {
-    if (e.requestId !== PANE) return next(e)
-    const msg = e.data as EditorMessage
-
-    switch (msg.type) {
-      case 'edit': {
-        await update($, draft, () => msg.text)
-        if (msg.query === null && lastQuery === null) return {}
-        lastQuery = msg.query
-        return { props: await editorProps($, msg.query) }
-      }
-      case 'submit':
-        await update($, draft, () => msg.text)
-        await closeEditor($, msg.text)
-        return {}
-      case 'cancel':
-        await update($, draft, () => msg.text)
-        await closeEditor($, null)
-        return {}
-      case 'copy':
-        await $.ui.copy({ text: msg.text, surface: e.surface })
-        return {}
+  on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+    const moved = await next(e)
+    const line = e.element?.startsWith('line:') ? Number(e.element.slice(5)) : NaN
+    if (moved.deny === undefined && Number.isInteger(line)) {
+      await update($, doc, d => (d.active === line ? d : { ...d, active: line }))
     }
-    return next(e)
+    return moved
   })
 
   // Closing without sending (Esc, the close mark, Cancelar) hands the draft
@@ -182,7 +268,7 @@ export const register: Register = (on, options) => {
   on('ui.close', { id: PANE }, async ($, e, next) => {
     const closed = await next(e)
     if (isSending || e.origin.kind === 'unload') return closed
-    const text = await read($, draft)
+    const text = textOf(await read($, doc))
     if (text !== '') await $.prompt.fill({ text, mode: 'replace' })
     return closed
   })

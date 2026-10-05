@@ -3,14 +3,14 @@
   "owner": { "name": "Higor César", "url": "https://github.com/higorcesarqn" },
   "metadata": {
     "description": "Warp-style Rich Input Editor for Claude Code",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "rich-input",
       "source": "./plugins/rich-input",
       "description": "Multi-line editor pane with @file/@folder autocomplete that hands the text back to the Claude Code prompt",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "productivity"
     }
   ]
