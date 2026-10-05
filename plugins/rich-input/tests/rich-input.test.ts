@@ -65,7 +65,7 @@ test('@ completes folder by folder, Enter opens a line, Send hands the text to t
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'line:0', text: 'Fix @', kind: 'change' })
+  await ui.input({ key: 'edit:0', text: 'Fix @', kind: 'change' })
   expect((await ui.findAll({ type: 'Button', text: /\/$/ })).map(b => b.text)).toEqual(['docs/', 'src/'])
 
   await ui.press({ key: 'sug:1' })
@@ -73,11 +73,11 @@ test('@ completes folder by folder, Enter opens a line, Send hands the text to t
 
   await ui.press({ key: 'sug:0' })
   await ui.press({ key: 'sug:0' })
-  expect((await ui.find({ key: 'line:0' }))?.text).toBe('Fix @src/lib/parse.ts ')
+  expect((await ui.find({ key: 'edit:0' }))?.text).toBe('Fix @src/lib/parse.ts ')
   expect(await ui.find({ key: 'sug:0' })).toBeUndefined()
 
-  await ui.input({ key: 'line:0', text: 'Fix @src/lib/parse.ts ' })
-  await ui.input({ key: 'line:1', text: 'ok', kind: 'change' })
+  await ui.input({ key: 'edit:0', text: 'Fix @src/lib/parse.ts ' })
+  await ui.input({ key: 'edit:1', text: 'ok', kind: 'change' })
   await ui.press({ key: 'send' })
 
   expect(filled).toEqual(['Fix @src/lib/parse.ts \nok'])
@@ -88,10 +88,25 @@ test('Enter on a line with completions open takes the first one', async ($, on) 
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'line:0', text: 'see @pri', kind: 'change' })
-  await ui.input({ key: 'line:0', text: 'see @pri' })
-  expect((await ui.find({ key: 'line:0' }))?.text).toBe('see @src/lib/print.ts ')
+  await ui.input({ key: 'edit:0', text: 'see @pri', kind: 'change' })
+  await ui.input({ key: 'edit:0', text: 'see @pri' })
+  expect((await ui.find({ key: 'edit:0' }))?.text).toBe('see @src/lib/print.ts ')
   expect(await ui.find({ key: 'line:1' })).toBeUndefined()
+})
+
+test('only the active line is a field; the others are drawn with their text', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  const ui = await $.ui.mount(PANE)
+
+  await ui.input({ key: 'edit:0', text: 'one' })
+  await ui.input({ key: 'edit:1', text: 'two' })
+  expect((await ui.findAll({ type: 'Input' })).map(i => i.key)).toEqual(['edit:2'])
+  expect((await ui.find({ key: 'line:0' }))?.text).toBe('one')
+  expect((await ui.find({ key: 'line:1' }))?.text).toBe('two')
+
+  await ui.press({ key: 'line:0' })
+  expect((await ui.findAll({ type: 'Input' })).map(i => [i.key, i.text])).toEqual([['edit:0', 'one']])
 })
 
 test('a pasted text with newlines becomes several lines', async ($, on) => {
@@ -99,26 +114,26 @@ test('a pasted text with newlines becomes several lines', async ($, on) => {
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'line:0', text: 'one\ntwo\nthree', kind: 'change' })
-  expect((await ui.find({ key: 'line:2' }))?.text).toBe('three')
+  await ui.input({ key: 'edit:0', text: 'one\ntwo\nthree', kind: 'change' })
+  expect((await ui.find({ key: 'edit:2' }))?.text).toBe('three')
 
   await ui.press({ key: 'delete-line' })
   await ui.press({ key: 'send' })
   expect(filled).toEqual(['one\ntwo'])
 })
 
-test('a line keeps its field when another line is inserted above or below it', async ($, on) => {
+test('Enter in the middle opens a line there and keeps the lines around it', async ($, on) => {
   const filled: string[] = []
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'line:0', text: 'first\nsecond', kind: 'change' })
-  await ui.input({ key: 'line:0', text: 'first' })
-  const keys = (await ui.findAll({ type: 'Input' })).map(i => i.key)
-  expect(keys).toEqual(['line:0', 'line:2', 'line:1'])
-  expect((await ui.findAll({ type: 'Input' })).map(i => i.text)).toEqual(['first', '', 'second'])
+  await ui.input({ key: 'edit:0', text: 'first\nsecond', kind: 'change' })
+  await ui.press({ key: 'line:0' })
+  await ui.input({ key: 'edit:0', text: 'first' })
+  expect((await ui.find({ key: 'line:0' }))?.text).toBe('first')
+  expect((await ui.find({ key: 'line:1' }))?.text).toBe('second')
 
-  await ui.input({ key: 'line:2', text: 'middle', kind: 'change' })
+  await ui.input({ key: 'edit:2', text: 'middle', kind: 'change' })
   await ui.press({ key: 'send' })
   expect(filled).toEqual(['first\nmiddle\nsecond'])
 })

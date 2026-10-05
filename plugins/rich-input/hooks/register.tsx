@@ -21,6 +21,8 @@ type $ = EngineInterface
 let index: { root: string; at: number; entries: Entry[] } | null = null
 let isSending = false
 
+/** The field the active line is edited in, and the row each other line is drawn as. */
+const editKey = (id: number) => `edit:${id}`
 const lineKey = (id: number) => `line:${id}`
 const textOf = (d: Doc) =>
   d.lines
@@ -142,7 +144,7 @@ async function changeLine($: $, id: number, value: string) {
     lines.splice(at, 1, { id, text: parts[0]! }, ...added)
     return { lines, nextId: d.nextId + added.length, active: lastId, sug }
   })
-  if (parts.length > 1) await focus($, lineKey(lastId))
+  if (parts.length > 1) await focus($, editKey(lastId))
 }
 
 /** Enter on a line: takes the first completion, or opens a new line below. */
@@ -158,7 +160,7 @@ async function submitLine($: $, id: number, value: string) {
     lines.splice(at + 1, 0, { id: newId, text: '' })
     return { lines, nextId: newId + 1, active: newId, sug: null }
   })
-  await focus($, lineKey(newId))
+  await focus($, editKey(newId))
 }
 
 /** Puts a completion in place of the line's `@query`; a folder opens its own. */
@@ -175,7 +177,13 @@ async function accept($: $, id: number, choice: Suggestion) {
     active: id,
     sug,
   }))
-  await focus($, sug !== null ? 'sug:0' : lineKey(id))
+  await focus($, sug !== null ? 'sug:0' : editKey(id))
+}
+
+/** Makes another line the one being edited, and gives its field the keyboard. */
+async function editLine($: $, id: number) {
+  await update($, doc, d => (d.active === id ? d : { ...d, active: id, sug: null }))
+  await focus($, editKey(id))
 }
 
 async function deleteLine($: $) {
@@ -184,7 +192,7 @@ async function deleteLine($: $) {
   const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : [{ id: d.nextId, text: '' }]
   const active = lines[Math.max(0, at - 1)]!.id
   await update($, doc, () => ({ lines, nextId: d.nextId + 1, active, sug: null }))
-  await focus($, lineKey(active))
+  await focus($, editKey(active))
 }
 
 export const register: Register = (on, options) => {
@@ -228,15 +236,28 @@ export const register: Register = (on, options) => {
     // field (and the person's typing in it) with its own line.
     const rows: RenderElement[] = []
     d.lines.forEach((line, i) => {
+      const gutter = `${String(i + 1).padStart(width)} │`
+      if (line.id !== d.active) {
+        // A field without the focus is not drawn with its text on every
+        // terminal, so only the active line is a field: the others are rows
+        // the ring walks, and Enter (or a click) on one edits it.
+        rows.push(
+          <Box flexDirection="row">
+            <Text dimColor>{gutter}</Text>
+            <Button key={lineKey(line.id)} plain label={line.text === '' ? ' ' : line.text} onPress={() => editLine($, line.id)} />
+          </Box>,
+        )
+        return
+      }
       const isMenu = d.sug !== null && d.sug.line === line.id
       rows.push(
         <ui.Input
-          key={lineKey(line.id)}
-          label={`${String(i + 1).padStart(width)} │`}
+          key={editKey(line.id)}
+          label={gutter}
           value={line.text}
           placeholder={d.lines.length === 1 ? 'Escreva o prompt… @ referencia arquivos e pastas' : undefined}
           submitLabel={isMenu ? 'aceitar' : 'nova linha'}
-          autoFocus={line.id === d.active ? true : undefined}
+          autoFocus
           onInput={value => changeLine($, line.id, value)}
           onSubmit={value => submitLine($, line.id, value)}
         />,
@@ -276,12 +297,11 @@ export const register: Register = (on, options) => {
     )
   })
 
+  // Walking the ring (Tab, the arrows) onto another line's row edits that line.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
     const id = e.element?.startsWith('line:') ? Number(e.element.slice(5)) : NaN
-    if (moved.deny === undefined && Number.isInteger(id)) {
-      await update($, doc, d => (d.active === id ? d : { ...d, active: id }))
-    }
+    if (moved.deny === undefined && e.origin.kind === 'person' && Number.isInteger(id)) void editLine($, id)
     return moved
   })
 
