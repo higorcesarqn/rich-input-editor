@@ -5,7 +5,7 @@ import type { Doc, Line, Suggestion } from '../types'
 import { complete, type Entry, mentionAt, withDirs } from './complete'
 
 const PANE = 'rich-input'
-const EMPTY: Doc = { lines: [{ id: 0, text: '' }], nextId: 1, active: 0, sug: null }
+const EMPTY: Doc = { lines: [{ id: 0, text: '' }], nextId: 1, active: 0, epoch: 0, sug: null }
 const doc = atom({ plugin: 'rich-input', key: 'doc' } as const, EMPTY)
 
 /** Folders the fallback walk skips: build output and dependencies. */
@@ -21,8 +21,13 @@ type $ = EngineInterface
 let index: { root: string; at: number; entries: Entry[] } | null = null
 let isSending = false
 
-/** The field the active line is edited in, and the row each other line is drawn as. */
-const editKey = (id: number) => `edit:${id}`
+/**
+ * The field the active line is edited in, and the row each other line is
+ * drawn as. A field keeps what the person last left in it (an Enter empties
+ * it) over the text drawn, so each turn of a line as the active one takes a
+ * fresh field (`epoch`), which starts from the line's text.
+ */
+const editKey = (id: number, epoch: number) => `edit:${id}:${epoch}`
 const lineKey = (id: number) => `line:${id}`
 const textOf = (d: Doc) =>
   d.lines
@@ -32,9 +37,9 @@ const textOf = (d: Doc) =>
 const indexOf = (d: Doc, id: number) => d.lines.findIndex(l => l.id === id)
 
 /** The doc for a text, one fresh line id per line. */
-function docOf(text: string): Doc {
+function docOf(text: string, epoch: number): Doc {
   const lines: Line[] = (text === '' ? [''] : text.split(/\r?\n/)).map((t, id) => ({ id, text: t }))
-  return { lines, nextId: lines.length, active: lines[lines.length - 1]!.id, sug: null }
+  return { lines, nextId: lines.length, active: lines[lines.length - 1]!.id, epoch, sug: null }
 }
 
 /** The project's files and folders: git's list, else a bounded walk. */
@@ -98,7 +103,7 @@ async function openEditor($: $, extra = '') {
   if (!isOpen) {
     const box = await $.prompt.read()
     const text = [box.text, extra].filter(t => t !== '').join(' ')
-    await update($, doc, () => docOf(text))
+    await update($, doc, d => docOf(text, d.epoch + 1))
     // The pane takes the keyboard only over an empty composer.
     if (box.text !== '') await $.prompt.fill({ text: '', mode: 'replace' })
   }
@@ -142,9 +147,10 @@ async function changeLine($: $, id: number, value: string) {
     const added = parts.slice(1).map((text, k) => ({ id: d.nextId + k, text }))
     const lines = [...d.lines]
     lines.splice(at, 1, { id, text: parts[0]! }, ...added)
-    return { lines, nextId: d.nextId + added.length, active: lastId, sug }
+    const epoch = added.length > 0 ? d.epoch + 1 : d.epoch
+    return { lines, nextId: d.nextId + added.length, active: lastId, epoch, sug }
   })
-  if (parts.length > 1) await focus($, editKey(lastId))
+  if (parts.length > 1) await focus($, editKey(lastId, (await read($, doc)).epoch))
 }
 
 /** Enter on a line: takes the first completion, or opens a new line below. */
@@ -158,9 +164,9 @@ async function submitLine($: $, id: number, value: string) {
     const lines = [...cur.lines]
     lines[at] = { id, text: value }
     lines.splice(at + 1, 0, { id: newId, text: '' })
-    return { lines, nextId: newId + 1, active: newId, sug: null }
+    return { lines, nextId: newId + 1, active: newId, epoch: cur.epoch + 1, sug: null }
   })
-  await focus($, editKey(newId))
+  await focus($, editKey(newId, (await read($, doc)).epoch))
 }
 
 /** Puts a completion in place of the line's `@query`; a folder opens its own. */
@@ -175,15 +181,16 @@ async function accept($: $, id: number, choice: Suggestion) {
     ...cur,
     lines: cur.lines.map(l => (l.id === id ? { id, text: next } : l)),
     active: id,
+    epoch: cur.epoch + 1,
     sug,
   }))
-  await focus($, sug !== null ? 'sug:0' : editKey(id))
+  await focus($, sug !== null ? 'sug:0' : editKey(id, (await read($, doc)).epoch))
 }
 
 /** Makes another line the one being edited, and gives its field the keyboard. */
 async function editLine($: $, id: number) {
-  await update($, doc, d => (d.active === id ? d : { ...d, active: id, sug: null }))
-  await focus($, editKey(id))
+  await update($, doc, d => (d.active === id ? d : { ...d, active: id, epoch: d.epoch + 1, sug: null }))
+  await focus($, editKey(id, (await read($, doc)).epoch))
 }
 
 async function deleteLine($: $) {
@@ -191,8 +198,8 @@ async function deleteLine($: $) {
   const at = Math.max(0, indexOf(d, d.active))
   const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : [{ id: d.nextId, text: '' }]
   const active = lines[Math.max(0, at - 1)]!.id
-  await update($, doc, () => ({ lines, nextId: d.nextId + 1, active, sug: null }))
-  await focus($, editKey(active))
+  await update($, doc, cur => ({ lines, nextId: d.nextId + 1, active, epoch: cur.epoch + 1, sug: null }))
+  await focus($, editKey(active, (await read($, doc)).epoch))
 }
 
 export const register: Register = (on, options) => {
@@ -252,7 +259,7 @@ export const register: Register = (on, options) => {
       const isMenu = d.sug !== null && d.sug.line === line.id
       rows.push(
         <ui.Input
-          key={editKey(line.id)}
+          key={editKey(line.id, d.epoch)}
           label={gutter}
           value={line.text}
           placeholder={d.lines.length === 1 ? 'Escreva o prompt… @ referencia arquivos e pastas' : undefined}

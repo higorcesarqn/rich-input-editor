@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { Mounted } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { complete, mentionAt, withDirs } from '../hooks/complete'
@@ -60,12 +61,26 @@ function engine(on: On, filled: string[]) {
   on('ui.toast', () => ({ value: undefined }))
 }
 
+type Pane = Mounted<'terminal', 'Pane'>
+
+/** The one field the pane draws: the active line's. */
+async function field(ui: Pane) {
+  const fields = await ui.findAll({ type: 'Input' })
+  expect(fields).toHaveLength(1)
+  return fields[0]!
+}
+
+/** Types into the active line: an edit, or with `enter` the Enter key. */
+async function type(ui: Pane, text: string, enter = false) {
+  await ui.input({ key: (await field(ui)).key!, text, kind: enter ? 'submit' : 'change' })
+}
+
 test('@ completes folder by folder, Enter opens a line, Send hands the text to the prompt', async ($, on) => {
   const filled: string[] = []
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'edit:0', text: 'Fix @', kind: 'change' })
+  await type(ui, 'Fix @')
   expect((await ui.findAll({ type: 'Button', text: /\/$/ })).map(b => b.text)).toEqual(['docs/', 'src/'])
 
   await ui.press({ key: 'sug:1' })
@@ -73,11 +88,11 @@ test('@ completes folder by folder, Enter opens a line, Send hands the text to t
 
   await ui.press({ key: 'sug:0' })
   await ui.press({ key: 'sug:0' })
-  expect((await ui.find({ key: 'edit:0' }))?.text).toBe('Fix @src/lib/parse.ts ')
+  expect((await field(ui)).text).toBe('Fix @src/lib/parse.ts ')
   expect(await ui.find({ key: 'sug:0' })).toBeUndefined()
 
-  await ui.input({ key: 'edit:0', text: 'Fix @src/lib/parse.ts ' })
-  await ui.input({ key: 'edit:1', text: 'ok', kind: 'change' })
+  await type(ui, 'Fix @src/lib/parse.ts ', true)
+  await type(ui, 'ok')
   await ui.press({ key: 'send' })
 
   expect(filled).toEqual(['Fix @src/lib/parse.ts \nok'])
@@ -88,9 +103,9 @@ test('Enter on a line with completions open takes the first one', async ($, on) 
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'edit:0', text: 'see @pri', kind: 'change' })
-  await ui.input({ key: 'edit:0', text: 'see @pri' })
-  expect((await ui.find({ key: 'edit:0' }))?.text).toBe('see @src/lib/print.ts ')
+  await type(ui, 'see @pri')
+  await type(ui, 'see @pri', true)
+  expect((await field(ui)).text).toBe('see @src/lib/print.ts ')
   expect(await ui.find({ key: 'line:1' })).toBeUndefined()
 })
 
@@ -99,14 +114,29 @@ test('only the active line is a field; the others are drawn with their text', as
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'edit:0', text: 'one' })
-  await ui.input({ key: 'edit:1', text: 'two' })
-  expect((await ui.findAll({ type: 'Input' })).map(i => i.key)).toEqual(['edit:2'])
+  await type(ui, 'one', true)
+  await type(ui, 'two', true)
   expect((await ui.find({ key: 'line:0' }))?.text).toBe('one')
   expect((await ui.find({ key: 'line:1' }))?.text).toBe('two')
+  expect((await field(ui)).text).toBe('')
+})
 
+test('going back to a line after Enter edits it from its text, in a fresh field', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  const ui = await $.ui.mount(PANE)
+
+  await type(ui, 'abc', true)
+  const first = (await field(ui)).key
   await ui.press({ key: 'line:0' })
-  expect((await ui.findAll({ type: 'Input' })).map(i => [i.key, i.text])).toEqual([['edit:0', 'one']])
+  const back = await field(ui)
+  expect(back.text).toBe('abc')
+  expect(back.key).not.toBe(first)
+  expect(back.key).toMatch(/^edit:0:/)
+
+  await type(ui, 'abXc')
+  await ui.press({ key: 'send' })
+  expect(filled).toEqual(['abXc'])
 })
 
 test('a pasted text with newlines becomes several lines', async ($, on) => {
@@ -114,8 +144,8 @@ test('a pasted text with newlines becomes several lines', async ($, on) => {
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'edit:0', text: 'one\ntwo\nthree', kind: 'change' })
-  expect((await ui.find({ key: 'edit:2' }))?.text).toBe('three')
+  await type(ui, 'one\ntwo\nthree')
+  expect((await field(ui)).text).toBe('three')
 
   await ui.press({ key: 'delete-line' })
   await ui.press({ key: 'send' })
@@ -127,13 +157,14 @@ test('Enter in the middle opens a line there and keeps the lines around it', asy
   engine(on, filled)
   const ui = await $.ui.mount(PANE)
 
-  await ui.input({ key: 'edit:0', text: 'first\nsecond', kind: 'change' })
+  await type(ui, 'first\nsecond')
   await ui.press({ key: 'line:0' })
-  await ui.input({ key: 'edit:0', text: 'first' })
+  await type(ui, 'first', true)
   expect((await ui.find({ key: 'line:0' }))?.text).toBe('first')
   expect((await ui.find({ key: 'line:1' }))?.text).toBe('second')
 
-  await ui.input({ key: 'edit:2', text: 'middle', kind: 'change' })
+  await type(ui, 'middle')
   await ui.press({ key: 'send' })
   expect(filled).toEqual(['first\nmiddle\nsecond'])
 })
+

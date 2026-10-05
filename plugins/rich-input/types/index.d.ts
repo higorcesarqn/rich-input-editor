@@ -11,8 +11,12 @@ export type Suggestions = { line: number; query: string; items: Suggestion[] }
  */
 export type Line = { id: number; text: string }
 
-/** The text being edited, the line holding the cursor and the open completions. */
-export type Doc = { lines: Line[]; nextId: number; active: number; sug: Suggestions | null }
+/**
+ * The text being edited, the line holding the cursor, how many times a line
+ * has become the active one (each time takes a fresh field) and the open
+ * completions.
+ */
+export type Doc = { lines: Line[]; nextId: number; active: number; epoch: number; sug: Suggestions | null }
 
 declare module 'claude-code' {
   interface PluginState {
