@@ -1,0 +1,24 @@
+{
+  "name": "rich-input",
+  "version": "0.1.0",
+  "description": "Warp-style Rich Input Editor for Claude Code: a multi-line editor pane with @file/@folder autocomplete that hands the text back to the prompt",
+  "author": { "name": "Higor César", "url": "https://github.com/higorcesarqn" },
+  "homepage": "https://github.com/higorcesarqn/rich-input-editor",
+  "repository": "https://github.com/higorcesarqn/rich-input-editor",
+  "keywords": ["editor", "prompt", "autocomplete", "mentions", "warp"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "shortcutAction": {
+      "type": "string",
+      "title": "Keybinding action that opens the editor",
+      "description": "Engine action (keybindings.json) whose shortcut opens Rich Input. Bind a key to it in ~/.claude/keybindings.json.",
+      "default": "app:toggleReplTab"
+    },
+    "showBand": {
+      "type": "boolean",
+      "title": "Show the button above the prompt",
+      "description": "Draws the '✎ Rich input' row above the prompt (required for the keyboard shortcut to work).",
+      "default": true
+    }
+  }
+}
