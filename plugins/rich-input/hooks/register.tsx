@@ -119,7 +119,7 @@ async function closeEditor($: $, text: string | null) {
   if (text === null) return
   await update($, doc, () => EMPTY)
   const filled = await $.prompt.fill({ text, mode: 'replace' })
-  if (filled.isFilled) $.ui.toast('Prompt no campo: Enter envia (as @referências são resolvidas no envio)')
+  if (filled.isFilled) $.ui.toast('Text is in the prompt: press Enter to send (@ references are resolved on send)')
 }
 
 async function send($: $) {
@@ -210,15 +210,15 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'rich',
-      description: 'Abre o Rich Input: editor multi-linha com @arquivos e @pastas',
-      argumentHint: '[texto]',
+      description: 'Open Rich Input: a multi-line editor with @file and @folder completion',
+      argumentHint: '[text]',
     })
     return next(e)
   })
 
   on('command.run', { command: 'rich' }, async ($, e) => {
     await openEditor($, e.args.trim())
-    return { text: 'Rich Input aberto.' }
+    return { text: 'Rich Input opened.' }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -227,7 +227,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="row">
         <Button key="open-rich" label="✎ Rich input" plain dimColor action={openAction} onPress={() => openEditor($)} />
-        <Text dimColor> Alt+R ou /rich</Text>
+        <Text dimColor> Alt+R or /rich</Text>
       </Box>
     )
   })
@@ -235,7 +235,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
-    if (!('Input' in ui)) return <Text>Este ambiente não desenha o editor; use o prompt.</Text>
+    if (!('Input' in ui)) return <Text>This surface can't draw the editor; use the prompt.</Text>
 
     const d = await read($, doc)
     const width = String(d.lines.length).length
@@ -262,8 +262,8 @@ export const register: Register = (on, options) => {
           key={editKey(line.id, d.epoch)}
           label={gutter}
           value={line.text}
-          placeholder={d.lines.length === 1 ? 'Escreva o prompt… @ referencia arquivos e pastas' : undefined}
-          submitLabel={isMenu ? 'aceitar' : 'nova linha'}
+          placeholder={d.lines.length === 1 ? 'Write your prompt… @ mentions files and folders' : undefined}
+          submitLabel={isMenu ? 'accept' : 'new line'}
           autoFocus
           onInput={value => changeLine($, line.id, value)}
           onSubmit={value => submitLine($, line.id, value)}
@@ -290,13 +290,13 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box flexDirection="row">
-          <Button key="send" label="Enviar ao prompt" variant="primary" action={sendAction} onPress={() => send($)} />
+          <Button key="send" label="Send to prompt" variant="primary" action={sendAction} onPress={() => send($)} />
           <Text> </Text>
-          <Button key="delete-line" label="Apagar linha" onPress={() => deleteLine($)} />
+          <Button key="delete-line" label="Delete line" onPress={() => deleteLine($)} />
           <Text> </Text>
-          <Button key="cancel" label="Cancelar" role="dismiss" onPress={() => closeEditor($, null)} />
+          <Button key="cancel" label="Cancel" role="dismiss" onPress={() => closeEditor($, null)} />
           <Text dimColor wrap="truncate-end">
-            {'  '}Enter nova linha · Tab sugestões do @ · Ctrl+S envia · Esc sai
+            {'  '}Enter new line · Tab @ suggestions · Ctrl+S send · Esc leave
           </Text>
         </Box>
         {rows}
@@ -312,7 +312,7 @@ export const register: Register = (on, options) => {
     return moved
   })
 
-  // Closing without sending (Esc, the close mark, Cancelar) hands the draft
+  // Closing without sending (Esc, the close mark, Cancel) hands the draft
   // back to the prompt box, so nothing typed is lost.
   on('ui.close', { id: PANE }, async ($, e, next) => {
     const closed = await next(e)

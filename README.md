@@ -69,7 +69,7 @@ claude plugin install rich-input@rich-input-editor
 Plugins can't register keys of their own. Instead, the plugin's buttons listen to Claude Code keybinding *actions*, and you bind keys to those actions:
 
 - the **✎ Rich input** button (opens the editor) listens to `app:toggleReplTab`;
-- the **Enviar ao prompt** button (sends the text) listens to `app:toggleDiffPreSession`.
+- the **Send to prompt** button (sends the text) listens to `app:toggleDiffPreSession`.
 
 Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist) to open the editor with **Alt+R** and send with **Ctrl+S**:
 
@@ -94,13 +94,13 @@ Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist) t
 }
 ```
 
-If one of those actions is already in use in your setup, pick another action with no handler and set it in the plugin's `shortcutAction` or `sendAction` option (`/plugin configure rich-input@rich-input-editor`, or `/config`). The open shortcut only works while the button row above the prompt is visible (`showBand`, on by default). Without the shortcuts you can still use `/rich`, and **Tab** to the **Enviar ao prompt** button.
+If one of those actions is already in use in your setup, pick another action with no handler and set it in the plugin's `shortcutAction` or `sendAction` option (`/plugin configure rich-input@rich-input-editor`, or `/config`). The open shortcut only works while the button row above the prompt is visible (`showBand`, on by default). Without the shortcuts you can still use `/rich`, and **Tab** to the **Send to prompt** button.
 
 ## Usage
 
 1. Open the editor: **Alt+R**, `/rich`, or the **✎ Rich input** button. `/rich some text` opens it with that text.
 2. Write. **Enter** opens a new line below. Type `@` to mention files and folders.
-3. Press **Ctrl+S** (or Tab to **Enviar ao prompt** and press Enter). The editor closes and the text goes to the Claude Code prompt.
+3. Press **Ctrl+S** (or Tab to **Send to prompt** and press Enter). The editor closes and the text goes to the Claude Code prompt.
 4. Press **Enter** to send it.
 
 ### Keys
@@ -112,7 +112,7 @@ If one of those actions is already in use in your setup, pick another action wit
 | `↑` `↓` / `Tab` / `Shift+Tab` | Move between lines, suggestions and buttons (landing on a line edits it) |
 | `1`–`9` | Take that suggestion (while a suggestion has the focus) |
 | `Ctrl+S` | Send the text to the prompt (needs the keybinding above) |
-| **Apagar linha** button | Delete the current line |
+| **Delete line** button | Delete the current line |
 | `Esc` | Leave the editor (the draft goes back to the prompt) |
 
 ### Why "send" fills the prompt instead of sending directly
@@ -122,10 +122,9 @@ Claude Code doesn't expand `@file` mentions in a prompt that a plugin submits; i
 ## Known limitations
 
 - **Enter always opens a new line *below*.** The plugin can't see where the cursor is inside a line, so it can't split a line in two.
-- **Lines are deleted with the "Apagar linha" button,** not with Backspace on an empty line.
+- **Lines are deleted with the "Delete line" button,** not with Backspace on an empty line.
 - **Suggestions assume you're typing at the end of the line.** An `@` mention in the middle of a line is completed from the end of the line.
 - **No image attachments.** Paste images into the native prompt (`Ctrl+V` / `Alt+V`) after sending the text there.
-- The editor's on-screen text (button labels, hints) is in Portuguese.
 - The pane opens **above** the prompt (or beside the transcript in fullscreen). Claude Code doesn't let plugins place a pane below the prompt.
 
 ## How it works
@@ -154,3 +153,7 @@ claude plugin test .       # runs tests/*.test.ts
 Once Claude Code has loaded the plugin from disk, it writes the API types to `.claude-plugin/types/` (ignored by git). After that, `npx -p typescript tsc -p plugins/rich-input` type-checks the plugin.
 
 For live editing, run `claude --plugin-dir plugins/rich-input`. The plugin reloads by itself when you save a file.
+
+## License
+
+[MIT](LICENSE) © Higor César

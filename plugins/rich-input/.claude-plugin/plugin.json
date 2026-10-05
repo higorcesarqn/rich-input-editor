@@ -1,6 +1,6 @@
 {
   "name": "rich-input",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Warp-style Rich Input Editor for Claude Code: a multi-line editor pane with @file/@folder autocomplete that hands the text back to the prompt",
   "author": {
     "name": "Higor César",
@@ -15,6 +15,7 @@
     "mentions",
     "warp"
   ],
+  "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
     "shortcutAction": {
@@ -26,7 +27,7 @@
     "sendAction": {
       "type": "string",
       "title": "Keybinding action that sends the text",
-      "description": "Engine action whose shortcut presses 'Enviar ao prompt' while the editor is open. Bind a key to it in the PaneField context of ~/.claude/keybindings.json.",
+      "description": "Engine action whose shortcut presses 'Send to prompt' while the editor is open. Bind a key to it in the PaneField context of ~/.claude/keybindings.json.",
       "default": "app:toggleDiffPreSession"
     },
     "showBand": {

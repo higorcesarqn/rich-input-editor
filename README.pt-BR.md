@@ -19,7 +19,7 @@ O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no edi
   - Usa `git ls-files`, então respeita o `.gitignore`. Fora de um repositório git, percorre as pastas (até 5.000 itens, sem `node_modules`, `dist` etc.).
   - Caminhos com espaço ficam entre aspas (`@"docs/minhas notas.md"`), como o prompt nativo faz.
 - **Colar** um texto com várias linhas divide o texto em linhas.
-- **Você nunca perde o rascunho:** o que estava no prompt vai para o editor quando ele abre. Fechar o editor (`Esc`, botão de fechar, Cancelar) devolve o rascunho ao prompt.
+- **Você nunca perde o rascunho:** o que estava no prompt vai para o editor quando ele abre. Fechar o editor (`Esc`, botão de fechar, Cancel) devolve o rascunho ao prompt.
 - **Abre de três jeitos:** um atalho de teclado, o comando `/rich` ou o botão **✎ Rich input** acima do prompt.
 
 ## Requisitos
@@ -69,7 +69,7 @@ claude plugin install rich-input@rich-input-editor
 Plugins não podem registrar teclas próprias. Em vez disso, os botões do plugin escutam *ações* de keybinding do Claude Code, e você liga teclas a essas ações:
 
 - o botão **✎ Rich input** (abre o editor) escuta `app:toggleReplTab`;
-- o botão **Enviar ao prompt** (manda o texto) escuta `app:toggleDiffPreSession`.
+- o botão **Send to prompt** (manda o texto) escuta `app:toggleDiffPreSession`.
 
 Para abrir o editor com **Alt+R** e enviar com **Ctrl+S**, coloque isto no `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
 
@@ -94,13 +94,13 @@ Para abrir o editor com **Alt+R** e enviar com **Ctrl+S**, coloque isto no `~/.c
 }
 ```
 
-Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem uso e coloque-a na opção `shortcutAction` ou `sendAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho de abrir só funciona enquanto a linha do botão acima do prompt estiver visível (opção `showBand`, ligada por padrão). Sem os atalhos, você ainda pode usar o `/rich` e chegar ao botão **Enviar ao prompt** com **Tab**.
+Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem uso e coloque-a na opção `shortcutAction` ou `sendAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho de abrir só funciona enquanto a linha do botão acima do prompt estiver visível (opção `showBand`, ligada por padrão). Sem os atalhos, você ainda pode usar o `/rich` e chegar ao botão **Send to prompt** com **Tab**.
 
 ## Uso
 
 1. Abra o editor: **Alt+R**, `/rich` ou o botão **✎ Rich input**. `/rich algum texto` abre o editor já com esse texto.
 2. Escreva. **Enter** abre uma linha nova embaixo. Digite `@` para mencionar arquivos e pastas.
-3. Aperte **Ctrl+S** (ou vá com Tab até **Enviar ao prompt** e aperte Enter). O editor fecha e o texto vai para o prompt do Claude Code.
+3. Aperte **Ctrl+S** (ou vá com Tab até **Send to prompt** e aperte Enter). O editor fecha e o texto vai para o prompt do Claude Code.
 4. Aperte **Enter** para enviar.
 
 ### Teclas
@@ -112,7 +112,7 @@ Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem
 | `↑` `↓` / `Tab` / `Shift+Tab` | Anda entre linhas, sugestões e botões (chegar numa linha abre ela para edição) |
 | `1`–`9` | Aceita aquela sugestão (quando o foco está numa sugestão) |
 | `Ctrl+S` | Manda o texto para o prompt (precisa do keybinding acima) |
-| Botão **Apagar linha** | Apaga a linha atual |
+| Botão **Delete line** | Apaga a linha atual |
 | `Esc` | Sai do editor (o rascunho volta ao prompt) |
 
 ### Por que "enviar" põe o texto no prompt em vez de mandar direto
@@ -122,10 +122,10 @@ O Claude Code não expande menções `@arquivo` num prompt enviado por um plugin
 ## Limitações conhecidas
 
 - **Enter sempre abre a linha nova *embaixo*.** O plugin não sabe onde está o cursor dentro da linha, então não consegue dividir uma linha em duas.
-- **Para apagar uma linha, use o botão "Apagar linha".** Backspace numa linha vazia não apaga a linha.
+- **Para apagar uma linha, use o botão "Delete line".** Backspace numa linha vazia não apaga a linha.
 - **As sugestões consideram que você digita no fim da linha.** Uma menção `@` no meio da linha é completada a partir do fim da linha.
 - **Sem anexar imagens.** Depois de mandar o texto para o prompt nativo, cole as imagens lá (`Ctrl+V` / `Alt+V`).
-- Os textos da interface do editor (botões, dicas) estão em português.
+- Os textos da interface do editor (botões, dicas) estão em inglês.
 - O painel abre **acima** do prompt (ou ao lado da conversa, no fullscreen). O Claude Code não deixa plugins colocarem painel embaixo do prompt.
 
 ## Como funciona
@@ -154,3 +154,7 @@ claude plugin test .       # roda tests/*.test.ts
 Depois que o Claude Code carrega o plugin do disco, ele grava os tipos da API em `.claude-plugin/types/` (ignorado pelo git). A partir daí, `npx -p typescript tsc -p plugins/rich-input` faz a checagem de tipos.
 
 Para editar ao vivo, rode `claude --plugin-dir plugins/rich-input`. O plugin recarrega sozinho quando você salva um arquivo.
+
+## Licença
+
+[MIT](LICENSE) © Higor César
