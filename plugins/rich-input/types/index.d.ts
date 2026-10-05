@@ -1,11 +1,18 @@
 /** One `@` completion: what the menu shows and what replaces `@query`. */
 export type Suggestion = { label: string; insert: string; isDir: boolean }
 
-/** The completions open under one line, for the query typed there. */
+/** The completions open under one line (by its id), for the query typed there. */
 export type Suggestions = { line: number; query: string; items: Suggestion[] }
 
-/** The text being edited, one entry per line, and the open completions. */
-export type Doc = { lines: string[]; active: number; sug: Suggestions | null }
+/**
+ * One line of the text. Its `id` never changes while it exists: the pane keys
+ * the line's field by it, so inserting or deleting another line never hands
+ * this line's field (and the person's typing in it) to a different line.
+ */
+export type Line = { id: number; text: string }
+
+/** The text being edited, the line holding the cursor and the open completions. */
+export type Doc = { lines: Line[]; nextId: number; active: number; sug: Suggestions | null }
 
 declare module 'claude-code' {
   interface PluginState {

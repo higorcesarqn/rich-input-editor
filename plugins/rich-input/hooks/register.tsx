@@ -1,11 +1,11 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Doc, Suggestion } from '../types'
+import type { Doc, Line, Suggestion } from '../types'
 import { complete, type Entry, mentionAt, withDirs } from './complete'
 
 const PANE = 'rich-input'
-const EMPTY: Doc = { lines: [''], active: 0, sug: null }
+const EMPTY: Doc = { lines: [{ id: 0, text: '' }], nextId: 1, active: 0, sug: null }
 const doc = atom({ plugin: 'rich-input', key: 'doc' } as const, EMPTY)
 
 /** Folders the fallback walk skips: build output and dependencies. */
@@ -13,34 +13,26 @@ const SKIPPED = new Set(['.git', 'node_modules', 'dist', 'build', 'out', 'target
 const WALK_LIMIT = 5000
 const INDEX_TTL_MS = 15_000
 const MENU_SIZE = 9
-/** The pane's toolbar row, above the lines. */
-const CHROME_ROWS = 1
-const MIN_ROWS = 4
-const MAX_ROWS = 24
+/** The most rows the pane asks for; below it the pane is as tall as its content. */
+const PANE_ROWS = 20
 
 type $ = EngineInterface
 
 let index: { root: string; at: number; entries: Entry[] } | null = null
 let isSending = false
-let askedRows = 0
 
-const lineKey = (i: number) => `line:${i}`
-const textOf = (d: Doc) => d.lines.join('\n').replace(/\n+$/, '')
-const menuRows = (d: Doc) => (d.sug === null ? 0 : Math.min(d.sug.items.length, MENU_SIZE))
-const rowsFor = (d: Doc) => Math.max(MIN_ROWS, Math.min(MAX_ROWS, CHROME_ROWS + d.lines.length + menuRows(d)))
+const lineKey = (id: number) => `line:${id}`
+const textOf = (d: Doc) =>
+  d.lines
+    .map(l => l.text)
+    .join('\n')
+    .replace(/\n+$/, '')
+const indexOf = (d: Doc, id: number) => d.lines.findIndex(l => l.id === id)
 
-/**
- * Which lines fit in `room` rows: all of them, or a run ending at the active
- * line (so the lines above it stay in view), with a row left for each marker
- * of lines out of view.
- */
-function visibleLines(total: number, active: number, room: number): { start: number; end: number } {
-  if (total <= room) return { start: 0, end: total }
-  const oneMarker = Math.max(1, room - 1)
-  if (active >= total - oneMarker) return { start: total - oneMarker, end: total }
-  if (active < oneMarker) return { start: 0, end: oneMarker }
-  const shown = Math.max(1, room - 2)
-  return { start: active - shown + 1, end: active + 1 }
+/** The doc for a text, one fresh line id per line. */
+function docOf(text: string): Doc {
+  const lines: Line[] = (text === '' ? [''] : text.split(/\r?\n/)).map((t, id) => ({ id, text: t }))
+  return { lines, nextId: lines.length, active: lines[lines.length - 1]!.id, sug: null }
 }
 
 /** The project's files and folders: git's list, else a bounded walk. */
@@ -104,22 +96,12 @@ async function openEditor($: $, extra = '') {
   if (!isOpen) {
     const box = await $.prompt.read()
     const text = [box.text, extra].filter(t => t !== '').join(' ')
-    const lines = text === '' ? [''] : text.split(/\r?\n/)
-    await update($, doc, () => ({ lines, active: lines.length - 1, sug: null }))
+    await update($, doc, () => docOf(text))
     // The pane takes the keyboard only over an empty composer.
     if (box.text !== '') await $.prompt.fill({ text: '', mode: 'replace' })
   }
-  askedRows = rowsFor(await read($, doc))
-  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, closeOnEscape: true, rows: askedRows })
+  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, closeOnEscape: true, rows: PANE_ROWS })
   void entries($).catch(() => undefined)
-}
-
-/** Asks the pane for the rows its content needs as lines and completions come and go. */
-async function fit($: $) {
-  const rows = rowsFor(await read($, doc))
-  if (rows === askedRows) return
-  askedRows = rows
-  await $.ui.open({ id: PANE, title: 'Rich Input', closeOnEscape: true, rows })
 }
 
 /** Closes the editor; with a text, puts it in the prompt box to be sent. */
@@ -147,57 +129,61 @@ async function focus($: $, key: string) {
 }
 
 /** A line's text changed: a paste with newlines splits it into several. */
-async function changeLine($: $, i: number, value: string) {
+async function changeLine($: $, id: number, value: string) {
   const parts = value.split(/\r?\n/)
-  const last = i + parts.length - 1
-  const sug = await suggestionsFor($, last, parts[parts.length - 1]!)
+  const before = await read($, doc)
+  const lastId = parts.length > 1 ? before.nextId + parts.length - 2 : id
+  const sug = await suggestionsFor($, lastId, parts[parts.length - 1]!)
   await update($, doc, d => {
+    const at = indexOf(d, id)
+    if (at < 0) return d
+    const added = parts.slice(1).map((text, k) => ({ id: d.nextId + k, text }))
     const lines = [...d.lines]
-    lines.splice(i, 1, ...parts)
-    return { lines, active: last, sug }
+    lines.splice(at, 1, { id, text: parts[0]! }, ...added)
+    return { lines, nextId: d.nextId + added.length, active: lastId, sug }
   })
-  await fit($)
-  if (parts.length > 1) await focus($, lineKey(last))
+  if (parts.length > 1) await focus($, lineKey(lastId))
 }
 
 /** Enter on a line: takes the first completion, or opens a new line below. */
-async function submitLine($: $, i: number, value: string) {
+async function submitLine($: $, id: number, value: string) {
   const d = await read($, doc)
-  if (d.sug !== null && d.sug.line === i) return accept($, i, d.sug.items[0]!)
+  if (d.sug !== null && d.sug.line === id) return accept($, id, d.sug.items[0]!)
+  const newId = d.nextId
   await update($, doc, cur => {
+    const at = indexOf(cur, id)
+    if (at < 0) return cur
     const lines = [...cur.lines]
-    lines[i] = value
-    lines.splice(i + 1, 0, '')
-    return { lines, active: i + 1, sug: null }
+    lines[at] = { id, text: value }
+    lines.splice(at + 1, 0, { id: newId, text: '' })
+    return { lines, nextId: newId + 1, active: newId, sug: null }
   })
-  await fit($)
-  await focus($, lineKey(i + 1))
+  await focus($, lineKey(newId))
 }
 
 /** Puts a completion in place of the line's `@query`; a folder opens its own. */
-async function accept($: $, i: number, choice: Suggestion) {
+async function accept($: $, id: number, choice: Suggestion) {
   const d = await read($, doc)
-  const line = d.lines[i] ?? ''
+  const line = d.lines[indexOf(d, id)]?.text ?? ''
   const m = mentionAt(line, line.length)
   if (m === null) return
   const next = line.slice(0, m.start) + choice.insert + (choice.isDir ? '' : ' ') + line.slice(m.end)
-  const sug = choice.isDir ? await suggestionsFor($, i, next) : null
-  await update($, doc, cur => {
-    const lines = [...cur.lines]
-    lines[i] = next
-    return { lines, active: i, sug }
-  })
-  await fit($)
-  await focus($, sug !== null ? 'sug:0' : lineKey(i))
+  const sug = choice.isDir ? await suggestionsFor($, id, next) : null
+  await update($, doc, cur => ({
+    ...cur,
+    lines: cur.lines.map(l => (l.id === id ? { id, text: next } : l)),
+    active: id,
+    sug,
+  }))
+  await focus($, sug !== null ? 'sug:0' : lineKey(id))
 }
 
 async function deleteLine($: $) {
   const d = await read($, doc)
-  const at = Math.min(d.active, d.lines.length - 1)
-  const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : ['']
-  const active = Math.max(0, at - 1)
-  await update($, doc, () => ({ lines, active, sug: null }))
-  await fit($)
+  const at = Math.max(0, indexOf(d, d.active))
+  const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : [{ id: d.nextId, text: '' }]
+  const active = lines[Math.max(0, at - 1)]!.id
+  await update($, doc, () => ({ lines, nextId: d.nextId + 1, active, sug: null }))
   await focus($, lineKey(active))
 }
 
@@ -238,24 +224,21 @@ export const register: Register = (on, options) => {
 
     const d = await read($, doc)
     const width = String(d.lines.length).length
-    // Everything is drawn to fit the pane's rows, so the engine never scrolls
-    // the lines above the cursor out of view.
-    const room = Math.max(1, e.props.scroll.bodyRows - CHROME_ROWS - menuRows(d))
-    const { start, end } = visibleLines(d.lines.length, Math.min(d.active, d.lines.length - 1), room)
-    const rows = []
-    if (start > 0) rows.push(<Text dimColor>{`${' '.repeat(width)} ↑ ${start} linha(s) acima`}</Text>)
-    for (let i = start; i < end; i++) {
-      const isMenu = d.sug !== null && d.sug.line === i
+    // Every line is drawn, always, keyed by its id: the surface keeps each
+    // field (and the person's typing in it) with its own line.
+    const rows: RenderElement[] = []
+    d.lines.forEach((line, i) => {
+      const isMenu = d.sug !== null && d.sug.line === line.id
       rows.push(
         <ui.Input
-          key={lineKey(i)}
+          key={lineKey(line.id)}
           label={`${String(i + 1).padStart(width)} │`}
-          value={d.lines[i]}
+          value={line.text}
           placeholder={d.lines.length === 1 ? 'Escreva o prompt… @ referencia arquivos e pastas' : undefined}
           submitLabel={isMenu ? 'aceitar' : 'nova linha'}
-          autoFocus={i === d.active ? true : undefined}
-          onInput={value => changeLine($, i, value)}
-          onSubmit={value => submitLine($, i, value)}
+          autoFocus={line.id === d.active ? true : undefined}
+          onInput={value => changeLine($, line.id, value)}
+          onSubmit={value => submitLine($, line.id, value)}
         />,
       )
       if (isMenu) {
@@ -268,16 +251,13 @@ export const register: Register = (on, options) => {
                 hotkey={String(j + 1)}
                 dimColor={!choice.isDir}
                 label={choice.label}
-                onPress={() => accept($, i, choice)}
+                onPress={() => accept($, line.id, choice)}
               />
             </Box>,
           ),
         )
       }
-    }
-    if (end < d.lines.length) {
-      rows.push(<Text dimColor>{`${' '.repeat(width)} ↓ ${d.lines.length - end} linha(s) abaixo`}</Text>)
-    }
+    })
 
     return (
       <Box flexDirection="column">
@@ -298,9 +278,9 @@ export const register: Register = (on, options) => {
 
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
-    const line = e.element?.startsWith('line:') ? Number(e.element.slice(5)) : NaN
-    if (moved.deny === undefined && Number.isInteger(line)) {
-      await update($, doc, d => (d.active === line ? d : { ...d, active: line }))
+    const id = e.element?.startsWith('line:') ? Number(e.element.slice(5)) : NaN
+    if (moved.deny === undefined && Number.isInteger(id)) {
+      await update($, doc, d => (d.active === id ? d : { ...d, active: id }))
     }
     return moved
   })
