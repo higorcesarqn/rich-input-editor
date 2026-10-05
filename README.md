@@ -108,6 +108,7 @@ If one of those actions is already in use in your setup, pick another action wit
 | Key | Action |
 | --- | --- |
 | `Enter` | New line below (with `@` suggestions open: take the first one) |
+| `←` `→` `Backspace` `Delete` | Edit inside the current line (fix one word without retyping the line) |
 | `↑` `↓` / `Tab` / `Shift+Tab` | Move between lines, suggestions and buttons (landing on a line edits it) |
 | `1`–`9` | Take that suggestion (while a suggestion has the focus) |
 | `Ctrl+S` | Send the text to the prompt (needs the keybinding above) |

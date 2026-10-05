@@ -108,6 +108,7 @@ Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem
 | Tecla | Ação |
 | --- | --- |
 | `Enter` | Linha nova embaixo (com sugestões de `@` abertas: aceita a primeira) |
+| `←` `→` `Backspace` `Delete` | Edita dentro da linha atual (corrige uma palavra sem redigitar a linha) |
 | `↑` `↓` / `Tab` / `Shift+Tab` | Anda entre linhas, sugestões e botões (chegar numa linha abre ela para edição) |
 | `1`–`9` | Aceita aquela sugestão (quando o foco está numa sugestão) |
 | `Ctrl+S` | Manda o texto para o prompt (precisa do keybinding acima) |

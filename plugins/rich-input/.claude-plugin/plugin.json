@@ -1,6 +1,6 @@
 {
   "name": "rich-input",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Warp-style Rich Input Editor for Claude Code: a multi-line editor pane with @file/@folder autocomplete that hands the text back to the prompt",
   "author": {
     "name": "Higor César",
