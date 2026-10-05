@@ -13,14 +13,35 @@ const SKIPPED = new Set(['.git', 'node_modules', 'dist', 'build', 'out', 'target
 const WALK_LIMIT = 5000
 const INDEX_TTL_MS = 15_000
 const MENU_SIZE = 9
+/** The pane's toolbar row, above the lines. */
+const CHROME_ROWS = 1
+const MIN_ROWS = 4
+const MAX_ROWS = 24
 
 type $ = EngineInterface
 
 let index: { root: string; at: number; entries: Entry[] } | null = null
 let isSending = false
+let askedRows = 0
 
 const lineKey = (i: number) => `line:${i}`
 const textOf = (d: Doc) => d.lines.join('\n').replace(/\n+$/, '')
+const menuRows = (d: Doc) => (d.sug === null ? 0 : Math.min(d.sug.items.length, MENU_SIZE))
+const rowsFor = (d: Doc) => Math.max(MIN_ROWS, Math.min(MAX_ROWS, CHROME_ROWS + d.lines.length + menuRows(d)))
+
+/**
+ * Which lines fit in `room` rows: all of them, or a run ending at the active
+ * line (so the lines above it stay in view), with a row left for each marker
+ * of lines out of view.
+ */
+function visibleLines(total: number, active: number, room: number): { start: number; end: number } {
+  if (total <= room) return { start: 0, end: total }
+  const oneMarker = Math.max(1, room - 1)
+  if (active >= total - oneMarker) return { start: total - oneMarker, end: total }
+  if (active < oneMarker) return { start: 0, end: oneMarker }
+  const shown = Math.max(1, room - 2)
+  return { start: active - shown + 1, end: active + 1 }
+}
 
 /** The project's files and folders: git's list, else a bounded walk. */
 async function entries($: $): Promise<Entry[]> {
@@ -88,8 +109,17 @@ async function openEditor($: $, extra = '') {
     // The pane takes the keyboard only over an empty composer.
     if (box.text !== '') await $.prompt.fill({ text: '', mode: 'replace' })
   }
-  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, closeOnEscape: true, rows: 16 })
+  askedRows = rowsFor(await read($, doc))
+  await $.ui.open({ id: PANE, title: 'Rich Input', focus: true, closeOnEscape: true, rows: askedRows })
   void entries($).catch(() => undefined)
+}
+
+/** Asks the pane for the rows its content needs as lines and completions come and go. */
+async function fit($: $) {
+  const rows = rowsFor(await read($, doc))
+  if (rows === askedRows) return
+  askedRows = rows
+  await $.ui.open({ id: PANE, title: 'Rich Input', closeOnEscape: true, rows })
 }
 
 /** Closes the editor; with a text, puts it in the prompt box to be sent. */
@@ -126,6 +156,7 @@ async function changeLine($: $, i: number, value: string) {
     lines.splice(i, 1, ...parts)
     return { lines, active: last, sug }
   })
+  await fit($)
   if (parts.length > 1) await focus($, lineKey(last))
 }
 
@@ -139,6 +170,7 @@ async function submitLine($: $, i: number, value: string) {
     lines.splice(i + 1, 0, '')
     return { lines, active: i + 1, sug: null }
   })
+  await fit($)
   await focus($, lineKey(i + 1))
 }
 
@@ -155,6 +187,7 @@ async function accept($: $, i: number, choice: Suggestion) {
     lines[i] = next
     return { lines, active: i, sug }
   })
+  await fit($)
   await focus($, sug !== null ? 'sug:0' : lineKey(i))
 }
 
@@ -164,6 +197,7 @@ async function deleteLine($: $) {
   const lines = d.lines.length > 1 ? d.lines.filter((_, i) => i !== at) : ['']
   const active = Math.max(0, at - 1)
   await update($, doc, () => ({ lines, active, sug: null }))
+  await fit($)
   await focus($, lineKey(active))
 }
 
@@ -204,8 +238,13 @@ export const register: Register = (on, options) => {
 
     const d = await read($, doc)
     const width = String(d.lines.length).length
+    // Everything is drawn to fit the pane's rows, so the engine never scrolls
+    // the lines above the cursor out of view.
+    const room = Math.max(1, e.props.scroll.bodyRows - CHROME_ROWS - menuRows(d))
+    const { start, end } = visibleLines(d.lines.length, Math.min(d.active, d.lines.length - 1), room)
     const rows = []
-    for (let i = 0; i < d.lines.length; i++) {
+    if (start > 0) rows.push(<Text dimColor>{`${' '.repeat(width)} ↑ ${start} linha(s) acima`}</Text>)
+    for (let i = start; i < end; i++) {
       const isMenu = d.sug !== null && d.sug.line === i
       rows.push(
         <ui.Input
@@ -236,20 +275,23 @@ export const register: Register = (on, options) => {
         )
       }
     }
+    if (end < d.lines.length) {
+      rows.push(<Text dimColor>{`${' '.repeat(width)} ↓ ${d.lines.length - end} linha(s) abaixo`}</Text>)
+    }
 
     return (
       <Box flexDirection="column">
-        {rows}
-        <Box flexDirection="row" marginTop={1}>
+        <Box flexDirection="row">
           <Button key="send" label="Enviar ao prompt" variant="primary" action={sendAction} onPress={() => send($)} />
           <Text> </Text>
           <Button key="delete-line" label="Apagar linha" onPress={() => deleteLine($)} />
           <Text> </Text>
           <Button key="cancel" label="Cancelar" role="dismiss" onPress={() => closeEditor($, null)} />
+          <Text dimColor wrap="truncate-end">
+            {'  '}Enter nova linha · Tab sugestões do @ · Ctrl+S envia · Esc sai
+          </Text>
         </Box>
-        <Text dimColor wrap="truncate-end">
-          Enter nova linha · Tab vai às sugestões do @ · Ctrl+S envia · Esc sai (o texto volta ao prompt)
-        </Text>
+        {rows}
       </Box>
     )
   })

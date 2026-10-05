@@ -56,6 +56,7 @@ function engine(on: On, filled: string[]) {
     filled.push(e.text)
     return { isFilled: true, text: e.text, cursor: e.text.length }
   })
+  on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
 }
@@ -105,4 +106,18 @@ test('a pasted text with newlines becomes several lines', async ($, on) => {
   await ui.press({ key: 'delete-line' })
   await ui.press({ key: 'send' })
   expect(filled).toEqual(['one\ntwo'])
+})
+
+test('in a short pane the lines above the cursor stay in view', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 5 } } })
+
+  await ui.input({ key: 'line:0', text: 'a\nb\nc\nd\ne', kind: 'change' })
+  const shown = (await ui.findAll({ type: 'Input' })).map(i => i.key)
+  expect(shown).toEqual(['line:2', 'line:3', 'line:4'])
+  expect(await ui.find({ text: '↑ 2 linha(s) acima' })).toBeDefined()
+
+  await ui.input({ key: 'line:4', text: 'e' })
+  expect((await ui.findAll({ type: 'Input' })).map(i => i.key)).toEqual(['line:3', 'line:4', 'line:5'])
 })

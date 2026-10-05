@@ -10,7 +10,7 @@ O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no edi
 
 ## Recursos
 
-- **Editor multi-linha num painel**, com um campo por linha. Ele recebe o teclado assim que abre, sem precisar de mouse, então funciona em qualquer terminal.
+- **Editor multi-linha num painel**, com um campo por linha. Ele recebe o teclado assim que abre, sem precisar de mouse, então funciona em qualquer terminal. O painel cresce junto com o texto e, se ficar baixo, as linhas acima do cursor continuam visíveis (`↑ n linha(s) acima`).
 - **Autocomplete de `@` para arquivos e pastas:**
   - `@` lista a raiz do projeto.
   - As sugestões aparecem como botões numerados embaixo da linha. **Tab** chega até elas, ou **Enter** aceita a primeira.

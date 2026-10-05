@@ -10,7 +10,7 @@ Claude Code already has `Ctrl+G`, which opens the prompt in your `$EDITOR`. But 
 
 ## Features
 
-- **Multi-line editor in a pane**, one input field per line. It takes the keyboard as soon as it opens: no mouse needed, so it works in any terminal.
+- **Multi-line editor in a pane**, one input field per line. It takes the keyboard as soon as it opens: no mouse needed, so it works in any terminal. The pane grows with the text, and in a short pane the lines above the cursor stay in view (`↑ n linha(s) acima`).
 - **`@` autocomplete for files and folders:**
   - `@` lists the top level of the project.
   - The suggestions appear as numbered buttons under the line. Press **Tab** to reach them, or **Enter** to take the first one.
