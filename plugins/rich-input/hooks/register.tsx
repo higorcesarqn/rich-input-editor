@@ -15,6 +15,8 @@ const INDEX_TTL_MS = 15_000
 const MENU_SIZE = 9
 /** The most rows the pane asks for; below it the pane is as tall as its content. */
 const PANE_ROWS = 20
+/** The width from which the fullscreen layout docks a pane beside the transcript. */
+const DOCK_COLUMNS = 110
 
 type $ = EngineInterface
 
@@ -35,6 +37,20 @@ const textOf = (d: Doc) =>
     .join('\n')
     .replace(/\n+$/, '')
 const indexOf = (d: Doc, id: number) => d.lines.findIndex(l => l.id === id)
+
+/**
+ * Where the pane goes and, when it lands above the prompt, why: the dock
+ * beside the transcript needs the fullscreen layout and 110 columns.
+ */
+function placementOf(p: { isFullscreen: boolean; columns: number }): string {
+  if (!p.isFullscreen) {
+    return 'above the prompt: docking on the right needs the fullscreen layout (try CLAUDE_CODE_NO_FLICKER=1)'
+  }
+  if (p.columns < DOCK_COLUMNS) {
+    return `above the prompt: docking on the right needs ${DOCK_COLUMNS} columns, this terminal has ${p.columns}`
+  }
+  return `on the right (${p.columns} columns)`
+}
 
 /** The doc for a text, one fresh line id per line. */
 function docOf(text: string, epoch: number): Doc {
@@ -218,7 +234,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'rich' }, async ($, e) => {
     await openEditor($, e.args.trim())
-    return { text: 'Rich Input opened.' }
+    return { text: `Rich Input opened ${placementOf(e.presentation)}.` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

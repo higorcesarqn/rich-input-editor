@@ -125,7 +125,7 @@ Claude Code doesn't expand `@file` mentions in a prompt that a plugin submits; i
 - **Lines are deleted with the "Delete line" button,** not with Backspace on an empty line.
 - **Suggestions assume you're typing at the end of the line.** An `@` mention in the middle of a line is completed from the end of the line.
 - **No image attachments.** Paste images into the native prompt (`Ctrl+V` / `Alt+V`) after sending the text there.
-- The pane opens **above** the prompt (or beside the transcript in fullscreen). Claude Code doesn't let plugins place a pane below the prompt.
+- The pane opens **above** the prompt, or **on the right** of the transcript when Claude Code is in its fullscreen layout and the terminal has **at least 110 columns**. That threshold is Claude Code's and plugins can't change it; `/rich` tells you which case you're in (for example `docking on the right needs 110 columns, this terminal has 98`). Inside a multiplexer with a sidebar, hide the sidebar or use a smaller font to get the columns. Claude Code doesn't let plugins place a pane below the prompt.
 
 ## How it works
 

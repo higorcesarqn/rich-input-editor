@@ -168,3 +168,17 @@ test('Enter in the middle opens a line there and keeps the lines around it', asy
   expect(filled).toEqual(['first\nmiddle\nsecond'])
 })
 
+
+test('/rich says where the pane goes and why it is not docked', async ($, on) => {
+  const filled: string[] = []
+  engine(on, filled)
+  on('ui.panes', () => ({ value: [] }))
+  on('prompt.read', () => ({ value: { text: '', cursor: 0 } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  const run = (isFullscreen: boolean, columns: number) =>
+    $.command.run({ command: 'rich', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen, columns } })
+
+  expect((await run(true, 160)).text).toBe('Rich Input opened on the right (160 columns).')
+  expect((await run(true, 98)).text).toContain('needs 110 columns, this terminal has 98')
+  expect((await run(false, 160)).text).toContain('needs the fullscreen layout')
+})
