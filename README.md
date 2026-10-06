@@ -96,6 +96,35 @@ Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist) t
 
 If one of those actions is already in use in your setup, pick another action with no handler and set it in the plugin's `shortcutAction` or `sendAction` option (`/plugin configure rich-input@rich-input-editor`, or `/config`). The open shortcut only works while the button row above the prompt is visible (`showBand`, on by default). Without the shortcuts you can still use `/rich`, and **Tab** to the **Send to prompt** button.
 
+## Pane on the right (fullscreen layout)
+
+The editor opens **on the right** of the conversation when Claude Code uses its **fullscreen layout** and the terminal has **at least 110 columns**. Otherwise it opens above the prompt. The 110-column threshold is Claude Code's and plugins can't change it.
+
+`/rich` tells you which case you're in:
+
+| `/rich` says | What to do |
+| --- | --- |
+| `opened on the right (185 columns)` | Nothing: it's docked. |
+| `docking on the right needs the fullscreen layout` | Turn the fullscreen layout on (below). |
+| `docking on the right needs 110 columns, this terminal has 98` | Make room: hide a sidebar, maximize the window or use a smaller font. |
+
+Inside a terminal multiplexer (tmux, herdr…) Claude Code starts in its main-screen layout, which never docks the pane. Set `CLAUDE_CODE_NO_FLICKER=1` to get the fullscreen layout:
+
+```powershell
+# PowerShell, this terminal only
+$env:CLAUDE_CODE_NO_FLICKER=1; claude
+
+# Windows, for every terminal opened from now on
+setx CLAUDE_CODE_NO_FLICKER 1
+```
+
+```bash
+# bash / zsh: add to ~/.bashrc or ~/.zshrc to keep it
+export CLAUDE_CODE_NO_FLICKER=1
+```
+
+Tested in herdr on Windows: with the variable set, the pane docked on the right at 185 columns.
+
 ## Usage
 
 1. Open the editor: **Alt+R**, `/rich`, or the **✎ Rich input** button. `/rich some text` opens it with that text.
@@ -125,7 +154,7 @@ Claude Code doesn't expand `@file` mentions in a prompt that a plugin submits; i
 - **Lines are deleted with the "Delete line" button,** not with Backspace on an empty line.
 - **Suggestions assume you're typing at the end of the line.** An `@` mention in the middle of a line is completed from the end of the line.
 - **No image attachments.** Paste images into the native prompt (`Ctrl+V` / `Alt+V`) after sending the text there.
-- The pane opens **above** the prompt, or **on the right** of the transcript when Claude Code is in its fullscreen layout and the terminal has **at least 110 columns**. That threshold is Claude Code's and plugins can't change it; `/rich` tells you which case you're in (for example `docking on the right needs 110 columns, this terminal has 98`). Inside a terminal multiplexer (tmux, herdr…) Claude Code starts in its main-screen layout, which never docks: start it with `CLAUDE_CODE_NO_FLICKER=1` to get the fullscreen layout (in PowerShell, `$env:CLAUDE_CODE_NO_FLICKER=1; claude`, or `setx CLAUDE_CODE_NO_FLICKER 1` to keep it). If a sidebar then leaves fewer than 110 columns, hide it or use a smaller font. Claude Code doesn't let plugins place a pane below the prompt.
+- The pane opens **above** the prompt unless Claude Code is in its fullscreen layout with at least 110 columns (see [Pane on the right](#pane-on-the-right-fullscreen-layout)). Claude Code doesn't let plugins place a pane below the prompt.
 
 ## How it works
 

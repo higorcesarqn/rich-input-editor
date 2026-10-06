@@ -96,6 +96,35 @@ Para abrir o editor com **Alt+R** e enviar com **Ctrl+S**, coloque isto no `~/.c
 
 Se alguma dessas ações já tiver uso no seu ambiente, escolha outra ação sem uso e coloque-a na opção `shortcutAction` ou `sendAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho de abrir só funciona enquanto a linha do botão acima do prompt estiver visível (opção `showBand`, ligada por padrão). Sem os atalhos, você ainda pode usar o `/rich` e chegar ao botão **Send to prompt** com **Tab**.
 
+## Painel na direita (layout de tela cheia)
+
+O editor abre **à direita** da conversa quando o Claude Code está no **layout de tela cheia** e o terminal tem **pelo menos 110 colunas**. Fora disso, ele abre acima do prompt. O limite de 110 colunas é do Claude Code e plugins não conseguem mudar.
+
+O `/rich` diz em qual caso você está:
+
+| O `/rich` diz | O que fazer |
+| --- | --- |
+| `opened on the right (185 columns)` | Nada: o painel está na direita. |
+| `docking on the right needs the fullscreen layout` | Ligue o layout de tela cheia (abaixo). |
+| `docking on the right needs 110 columns, this terminal has 98` | Abra espaço: esconda uma barra lateral, maximize a janela ou diminua a fonte. |
+
+Dentro de um multiplexador de terminal (tmux, herdr…) o Claude Code abre no layout de tela normal, que nunca encaixa o painel na direita. Defina `CLAUDE_CODE_NO_FLICKER=1` para ter o layout de tela cheia:
+
+```powershell
+# PowerShell, só neste terminal
+$env:CLAUDE_CODE_NO_FLICKER=1; claude
+
+# Windows, para todos os terminais abertos daqui em diante
+setx CLAUDE_CODE_NO_FLICKER 1
+```
+
+```bash
+# bash / zsh: coloque no ~/.bashrc ou ~/.zshrc para deixar fixo
+export CLAUDE_CODE_NO_FLICKER=1
+```
+
+Testado no herdr, no Windows: com a variável definida, o painel ficou na direita com 185 colunas.
+
 ## Uso
 
 1. Abra o editor: **Alt+R**, `/rich` ou o botão **✎ Rich input**. `/rich algum texto` abre o editor já com esse texto.
@@ -126,7 +155,7 @@ O Claude Code não expande menções `@arquivo` num prompt enviado por um plugin
 - **As sugestões consideram que você digita no fim da linha.** Uma menção `@` no meio da linha é completada a partir do fim da linha.
 - **Sem anexar imagens.** Depois de mandar o texto para o prompt nativo, cole as imagens lá (`Ctrl+V` / `Alt+V`).
 - Os textos da interface do editor (botões, dicas) estão em inglês.
-- O painel abre **acima** do prompt, ou **à direita** da conversa quando o Claude Code está no layout de tela cheia e o terminal tem **pelo menos 110 colunas**. Esse limite é do Claude Code e plugins não conseguem mudar; o `/rich` diz em qual caso você está (por exemplo `docking on the right needs 110 columns, this terminal has 98`). Dentro de um multiplexador de terminal (tmux, herdr…) o Claude Code abre no layout de tela normal, que nunca encaixa o painel: abra-o com `CLAUDE_CODE_NO_FLICKER=1` para ter o layout de tela cheia (no PowerShell, `$env:CLAUDE_CODE_NO_FLICKER=1; claude`, ou `setx CLAUDE_CODE_NO_FLICKER 1` para deixar fixo). Se depois disso uma barra lateral deixar menos de 110 colunas, esconda a barra ou diminua a fonte. O Claude Code não deixa plugins colocarem painel embaixo do prompt.
+- O painel abre **acima** do prompt, a não ser que o Claude Code esteja no layout de tela cheia com pelo menos 110 colunas (veja [Painel na direita](#painel-na-direita-layout-de-tela-cheia)). O Claude Code não deixa plugins colocarem painel embaixo do prompt.
 
 ## Como funciona
 
