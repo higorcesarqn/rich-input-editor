@@ -126,7 +126,7 @@ O Claude Code não expande menções `@arquivo` num prompt enviado por um plugin
 - **As sugestões consideram que você digita no fim da linha.** Uma menção `@` no meio da linha é completada a partir do fim da linha.
 - **Sem anexar imagens.** Depois de mandar o texto para o prompt nativo, cole as imagens lá (`Ctrl+V` / `Alt+V`).
 - Os textos da interface do editor (botões, dicas) estão em inglês.
-- O painel abre **acima** do prompt, ou **à direita** da conversa quando o Claude Code está no layout de tela cheia e o terminal tem **pelo menos 110 colunas**. Esse limite é do Claude Code e plugins não conseguem mudar; o `/rich` diz em qual caso você está (por exemplo `docking on the right needs 110 columns, this terminal has 98`). Dentro de um multiplexador com barra lateral, esconda a barra ou diminua a fonte para ganhar colunas. O Claude Code não deixa plugins colocarem painel embaixo do prompt.
+- O painel abre **acima** do prompt, ou **à direita** da conversa quando o Claude Code está no layout de tela cheia e o terminal tem **pelo menos 110 colunas**. Esse limite é do Claude Code e plugins não conseguem mudar; o `/rich` diz em qual caso você está (por exemplo `docking on the right needs 110 columns, this terminal has 98`). Dentro de um multiplexador de terminal (tmux, herdr…) o Claude Code abre no layout de tela normal, que nunca encaixa o painel: abra-o com `CLAUDE_CODE_NO_FLICKER=1` para ter o layout de tela cheia (no PowerShell, `$env:CLAUDE_CODE_NO_FLICKER=1; claude`, ou `setx CLAUDE_CODE_NO_FLICKER 1` para deixar fixo). Se depois disso uma barra lateral deixar menos de 110 colunas, esconda a barra ou diminua a fonte. O Claude Code não deixa plugins colocarem painel embaixo do prompt.
 
 ## Como funciona
 
