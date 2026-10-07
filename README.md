@@ -2,29 +2,27 @@
 
 **English** · [Português](README.pt-BR.md)
 
-A [Warp-style Rich Input Editor](https://docs.warp.dev/agents/cli-agents/rich-input/) for Claude Code, built as a plugin. It gives you a multi-line editor pane inside the terminal, with `@` autocomplete for files **and folders**. When you're done, it puts the text back in the Claude Code prompt.
+A [Warp-style Rich Input Editor](https://docs.warp.dev/agents/cli-agents/rich-input/) for Claude Code, built as a plugin. It turns Claude Code's own prompt box into a multi-line editor: **Enter** starts a new line where the cursor is, **Ctrl+Enter** sends, and `@` completes files **and folders**, one folder at a time.
 
 ## Why
 
-Claude Code already has `Ctrl+G`, which opens the prompt in your `$EDITOR`. But in an external editor you lose `@` autocomplete, so you have to type file paths from memory. This plugin keeps you inside Claude Code and completes `@` mentions as you type, one folder at a time.
+Claude Code already has `Ctrl+G`, which opens the prompt in your `$EDITOR`. But in an external editor you lose `@` autocomplete, so you have to type file paths from memory. And in the plain prompt box, Enter sends, so writing several lines takes `Shift+Enter` or `\` at each line end. With this plugin the prompt box itself works like an editor.
 
 ## Features
 
-- **Multi-line editor in a pane.** It takes the keyboard as soon as it opens: no mouse needed, so it works in any terminal. The line you're on is an input field; the other lines stay drawn as text, and moving onto one (arrows, Tab, or a click) lets you edit it. The pane grows with the text.
-- **`@` autocomplete for files and folders:**
+- **The prompt box is the editor.** The cursor moves freely: arrows, Home/End, Enter in the middle of a line splits it, Backspace at the start of a line joins it to the one above. Pasting, images and your prompt history work as usual, because it is Claude Code's own box.
+- **`@` completion that browses folders:**
   - `@` lists the top level of the project.
-  - The suggestions appear as numbered buttons under the line. Press **Tab** to reach them, or **Enter** to take the first one.
-  - Accepting a folder opens its contents right away (`@src/` → `@src/lib/` → file).
+  - The plugin's rows appear under the prompt's own suggestions. Taking a folder (`@src/`) keeps the mention open and lists that folder's contents, so you go `@src/` → `@src/lib/` → file.
   - A bare name (`@parse`) searches the whole project.
   - Uses `git ls-files`, so `.gitignore` is respected. Outside a git repository it walks the folders instead (up to 5,000 entries, skipping `node_modules`, `dist`, etc.).
   - Paths with spaces are quoted (`@"docs/my notes.md"`), the same way the native prompt does it.
-- **Pasting** text with several lines splits it into lines.
-- **Your draft is never lost:** whatever is in the prompt moves into the editor when it opens. Closing the editor (`Esc`, close mark, Cancel) puts the draft back in the prompt.
-- **Opens three ways:** a keyboard shortcut, the `/rich` command, or the **✎ Rich input** button above the prompt.
+- **A hint above the prompt** reminds you of the keys (`showHint`, on by default).
+- **`/rich`** prints how it works.
 
 ## Requirements
 
-- Claude Code **2.1.289 or newer**. The plugin uses Claude Code's *function hooks* API (TypeScript hooks modules with UI panes), which is in **early access** and may change between releases.
+- Claude Code **2.1.292 or newer**. The plugin uses Claude Code's *function hooks* API (TypeScript hooks modules), which is in **early access** and may change between releases.
 
 ## Installation
 
@@ -64,14 +62,9 @@ claude plugin marketplace add ./rich-input-editor
 claude plugin install rich-input@rich-input-editor
 ```
 
-## Keyboard shortcuts
+## Keyboard setup (required)
 
-Plugins can't register keys of their own. Instead, the plugin's buttons listen to Claude Code keybinding *actions*, and you bind keys to those actions:
-
-- the **✎ Rich input** button (opens the editor) listens to `app:toggleReplTab`;
-- the **Send to prompt** button (sends the text) listens to `app:toggleDiffPreSession`.
-
-Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist) to open the editor with **Alt+R** and send with **Ctrl+S**:
+Plugins can't change what Enter does in the prompt box, but Claude Code's keybindings can. Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist):
 
 ```json
 {
@@ -79,97 +72,50 @@ Add this to `~/.claude/keybindings.json` (create the file if it doesn't exist) t
   "$docs": "https://code.claude.com/docs/en/keybindings",
   "bindings": [
     {
-      "context": "Global",
+      "context": "Chat",
       "bindings": {
-        "alt+r": "app:toggleReplTab"
-      }
-    },
-    {
-      "context": "PaneField",
-      "bindings": {
-        "ctrl+s": "app:toggleDiffPreSession"
+        "enter": "chat:newline",
+        "ctrl+enter": "chat:submit",
+        "ctrl+s": "chat:submit"
       }
     }
   ]
 }
 ```
 
-If one of those actions is already in use in your setup, pick another action with no handler and set it in the plugin's `shortcutAction` or `sendAction` option (`/plugin configure rich-input@rich-input-editor`, or `/config`). The open shortcut only works while the button row above the prompt is visible (`showBand`, on by default). Without the shortcuts you can still use `/rich`, and **Tab** to the **Send to prompt** button.
+- **Enter** inserts a new line. While the `@` suggestions are open, Enter still takes the highlighted one.
+- **Ctrl+Enter** sends. Some terminals send Ctrl+Enter as a plain Enter; there, use **Ctrl+S**.
 
-## Pane on the right (fullscreen layout)
+This changes Enter in every Claude Code session. To go back, remove the `Chat` block.
 
-The editor opens **on the right** of the conversation when Claude Code uses its **fullscreen layout** and the terminal has **at least 110 columns**. Otherwise it opens above the prompt. The 110-column threshold is Claude Code's and plugins can't change it.
+Coming from 0.4: the editor pane is gone, so the `app:toggleReplTab` and `app:toggleDiffPreSession` bindings it used can be removed.
 
-`/rich` tells you which case you're in:
-
-| `/rich` says | What to do |
-| --- | --- |
-| `opened on the right (185 columns)` | Nothing: it's docked. |
-| `docking on the right needs the fullscreen layout` | Turn the fullscreen layout on (below). |
-| `docking on the right needs 110 columns, this terminal has 98` | Make room: hide a sidebar, maximize the window or use a smaller font. |
-
-Inside a terminal multiplexer (tmux, herdr…) Claude Code starts in its main-screen layout, which never docks the pane. Set `CLAUDE_CODE_NO_FLICKER=1` to get the fullscreen layout:
-
-```powershell
-# PowerShell, this terminal only
-$env:CLAUDE_CODE_NO_FLICKER=1; claude
-
-# Windows, for every terminal opened from now on
-setx CLAUDE_CODE_NO_FLICKER 1
-```
-
-```bash
-# bash / zsh: add to ~/.bashrc or ~/.zshrc to keep it
-export CLAUDE_CODE_NO_FLICKER=1
-```
-
-Tested in herdr on Windows: with the variable set, the pane docked on the right at 185 columns.
-
-## Usage
-
-1. Open the editor: **Alt+R**, `/rich`, or the **✎ Rich input** button. `/rich some text` opens it with that text.
-2. Write. **Enter** opens a new line below. Type `@` to mention files and folders.
-3. Press **Ctrl+S** (or Tab to **Send to prompt** and press Enter). The editor closes and the text goes to the Claude Code prompt.
-4. Press **Enter** to send it.
-
-### Keys
+## Keys
 
 | Key | Action |
 | --- | --- |
-| `Enter` | New line below (with `@` suggestions open: take the first one) |
-| `←` `→` `Backspace` `Delete` | Edit inside the current line (fix one word without retyping the line) |
-| `↑` `↓` / `Tab` / `Shift+Tab` | Move between lines, suggestions and buttons (landing on a line edits it) |
-| `1`–`9` | Take that suggestion (while a suggestion has the focus) |
-| `Ctrl+S` | Send the text to the prompt (needs the keybinding above) |
-| **Delete line** button | Delete the current line |
-| `Esc` | Leave the editor (the draft goes back to the prompt) |
-
-### Why "send" fills the prompt instead of sending directly
-
-Claude Code doesn't expand `@file` mentions in a prompt that a plugin submits; it only does that for prompts you submit yourself. To keep your `@` references working, the editor puts the text in the native prompt and you press Enter. This also gives you one last look before sending.
-
-## Known limitations
-
-- **Enter always opens a new line *below*.** The plugin can't see where the cursor is inside a line, so it can't split a line in two.
-- **Lines are deleted with the "Delete line" button,** not with Backspace on an empty line.
-- **Suggestions assume you're typing at the end of the line.** An `@` mention in the middle of a line is completed from the end of the line.
-- **No image attachments.** Paste images into the native prompt (`Ctrl+V` / `Alt+V`) after sending the text there.
-- The pane opens **above** the prompt unless Claude Code is in its fullscreen layout with at least 110 columns (see [Pane on the right](#pane-on-the-right-fullscreen-layout)). Claude Code doesn't let plugins place a pane below the prompt.
+| `Enter` | New line where the cursor is (with `@` suggestions open: take the highlighted one) |
+| `Ctrl+Enter` / `Ctrl+S` | Send the prompt |
+| `←` `→` `↑` `↓` `Home` `End` | Move the cursor |
+| `Backspace` at the start of a line | Join it to the line above |
+| `@` | Complete files and folders; taking a folder lists its contents |
 
 ## How it works
 
 ```
 plugins/rich-input/
-├── .claude-plugin/plugin.json   manifest and options (shortcutAction, sendAction, showBand)
+├── .claude-plugin/plugin.json   manifest and the showHint option
 ├── hooks/
 │   ├── hooks.json               points Claude Code at register.tsx
-│   ├── register.tsx             /rich command, pane (the active line as an Input, the others as rows), buttons, @ index, hand-back to the prompt
-│   └── complete.ts              @ completion: browse by folder, fuzzy search, mention detection
-├── types/index.d.ts             shared types and the plugin's state contract
+│   ├── register.tsx             /rich, the hint above the prompt, the @ rows, the project index
+│   └── complete.ts              @ completion: browse by folder, fuzzy search, typeahead rows
+├── types/index.d.ts             shared types
 └── tests/rich-input.test.ts     tests (claude plugin test)
 ```
 
-`register.tsx` opens a pane with `$.ui.open` and draws the active line as an `Input` and the other lines as rows that make their line active when focused. Each line has a stable id, so its field never passes to another line. The lines are kept in the plugin's state. Each change of a line checks whether it ends in an `@` mention. If it does, `register.tsx` draws the suggestions as buttons under that line, from a project index it caches for 15 seconds. On send, `register.tsx` closes the pane and puts the text in the prompt with `$.prompt.fill`.
+`register.tsx` hooks `prompt.autocomplete` for tokens that start with `@`. It adds rows to the prompt box's typeahead from a project index it caches for 15 seconds. A folder's row writes `@folder/` and leaves the cursor in the mention, so Claude Code asks again and the folder's contents come up. The multi-line editing itself is Claude Code's prompt box with the keybindings above.
+
+Earlier versions (up to 0.4) drew their own editor in a pane. A pane only offers single-line fields there, so it couldn't have a free cursor or join lines with Backspace; the prompt box can.
 
 ## Development
 

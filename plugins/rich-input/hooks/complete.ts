@@ -3,6 +3,9 @@ import type { Suggestion } from '../types'
 /** One path of the project index, `/`-separated and relative to its root. */
 export type Entry = { path: string; isDir: boolean }
 
+/** One row of the prompt box's typeahead, as `prompt.autocomplete` takes it. */
+export type Row = { text: string; label: string; description?: string }
+
 const LIMIT = 10
 
 /**
@@ -104,16 +107,13 @@ export function complete(entries: readonly Entry[], rawQuery: string): Suggestio
 }
 
 /**
- * The `@` mention the cursor is in: where its `@` is, where it ends and the
- * query typed after the `@` up to the cursor; null outside one.
+ * The typeahead rows for the token at the cursor, when it is an `@` mention:
+ * a folder's row leaves the cursor in it, so its contents come up next; a
+ * file's row ends the mention with a space.
  */
-export function mentionAt(text: string, cursor: number): { start: number; end: number; query: string } | null {
-  let i = cursor
-  while (i > 0 && !/\s/.test(text[i - 1]!) && text[i - 1] !== '@') i--
-  if (i === 0 || text[i - 1] !== '@') return null
-  const start = i - 1
-  if (start > 0 && !/\s/.test(text[start - 1]!)) return null
-  let end = cursor
-  while (end < text.length && !/\s/.test(text[end]!)) end++
-  return { start, end, query: text.slice(start + 1, cursor) }
+export function rows(entries: readonly Entry[], token: string): Row[] {
+  if (!token.startsWith('@')) return []
+  return complete(entries, token.slice(1)).map(s =>
+    s.isDir ? { text: s.insert, label: s.label, description: 'folder' } : { text: `${s.insert} `, label: s.label },
+  )
 }

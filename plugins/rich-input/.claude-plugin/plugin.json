@@ -1,7 +1,7 @@
 {
   "name": "rich-input",
-  "version": "0.4.1",
-  "description": "Warp-style Rich Input Editor for Claude Code: a multi-line editor pane with @file/@folder autocomplete that hands the text back to the prompt",
+  "version": "0.5.0",
+  "description": "Warp-style Rich Input for Claude Code: the prompt box as a multi-line editor (Enter for a new line, Ctrl+Enter to send) with @ completion that browses folder by folder",
   "author": {
     "name": "Higor César",
     "url": "https://github.com/higorcesarqn"
@@ -18,22 +18,10 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
-    "shortcutAction": {
-      "type": "string",
-      "title": "Keybinding action that opens the editor",
-      "description": "Engine action (keybindings.json) whose shortcut opens Rich Input. Bind a key to it in ~/.claude/keybindings.json.",
-      "default": "app:toggleReplTab"
-    },
-    "sendAction": {
-      "type": "string",
-      "title": "Keybinding action that sends the text",
-      "description": "Engine action whose shortcut presses 'Send to prompt' while the editor is open. Bind a key to it in the PaneField context of ~/.claude/keybindings.json.",
-      "default": "app:toggleDiffPreSession"
-    },
-    "showBand": {
+    "showHint": {
       "type": "boolean",
-      "title": "Show the button above the prompt",
-      "description": "Draws the '✎ Rich input' row above the prompt (required for the keyboard shortcut to work).",
+      "title": "Show the key hint above the prompt",
+      "description": "Draws '✎ Enter new line · Ctrl+Enter send · @ browses folders' above the prompt.",
       "default": true
     }
   }
