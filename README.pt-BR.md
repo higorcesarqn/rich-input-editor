@@ -2,23 +2,23 @@
 
 [English](README.md) · **Português**
 
-Um [Rich Input Editor no estilo do Warp](https://docs.warp.dev/agents/cli-agents/rich-input/) para o Claude Code, feito como plugin. Ele transforma o próprio prompt do Claude Code num editor multi-linha: **Enter** abre uma linha nova onde o cursor está, **Ctrl+Enter** envia, e o `@` completa arquivos **e pastas**, uma pasta de cada vez.
+Um [Rich Input Editor no estilo do Warp](https://docs.warp.dev/agents/cli-agents/rich-input/) para o Claude Code, feito como plugin. Ele transforma o próprio prompt do Claude Code num editor multi-linha que você liga e desliga: ligado, o **Enter** abre uma linha nova onde o cursor está e o **Ctrl+Enter** envia. O `@` completa arquivos **e pastas**, uma pasta de cada vez.
 
 ## Por quê
 
-O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no editor externo você perde o autocomplete de `@` e precisa digitar os caminhos de cabeça. E no prompt comum o Enter envia, então escrever várias linhas exige `Shift+Enter` ou `\` no fim de cada linha. Com este plugin, o próprio prompt funciona como um editor.
+O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no editor externo você perde o autocomplete de `@` e precisa digitar os caminhos de cabeça. E no prompt comum o Enter envia, então escrever várias linhas exige `Shift+Enter` ou `\` no fim de cada linha. Com este plugin, o próprio prompt funciona como um editor quando você quiser.
 
 ## Recursos
 
 - **O prompt é o editor.** O cursor anda livre: setas, Home/End, Enter no meio de uma linha divide a linha, Backspace no começo de uma linha junta com a de cima. Colar, imagens e o histórico de prompts funcionam como sempre, porque é o prompt do próprio Claude Code.
+- **Liga e desliga com uma tecla:** `Alt+R` ou `/rich`. Desligado, o Enter envia como sempre.
+- **Dá para ver quando está ligado:** o texto que você digita fica azul, `rich input` aparece no rodapé abaixo do prompt e a linha acima do prompt diz `✎ Rich input: on`.
 - **Autocomplete de `@` que navega pelas pastas:**
   - `@` lista a raiz do projeto.
   - As sugestões do plugin aparecem embaixo das sugestões do próprio prompt. Ao escolher uma pasta (`@src/`), a menção continua aberta e o conteúdo da pasta aparece, então você vai de `@src/` → `@src/lib/` → arquivo.
   - Digitar só um nome (`@parse`) busca no projeto inteiro.
   - Usa `git ls-files`, então respeita o `.gitignore`. Fora de um repositório git, percorre as pastas (até 5.000 itens, sem `node_modules`, `dist` etc.).
   - Caminhos com espaço ficam entre aspas (`@"docs/minhas notas.md"`), como o prompt nativo faz.
-- **Uma dica acima do prompt** lembra as teclas (`showHint`, ligada por padrão).
-- **`/rich`** explica como funciona.
 
 ## Requisitos
 
@@ -62,9 +62,20 @@ claude plugin marketplace add ./rich-input-editor
 claude plugin install rich-input@rich-input-editor
 ```
 
-## Configuração do teclado (obrigatória)
+## Ligar e desligar
 
-Plugins não conseguem mudar o que o Enter faz no prompt, mas os atalhos do Claude Code conseguem. Adicione isto ao `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
+Rode `/rich`, ou aperte `Alt+R`, para alternar. Plugins não conseguem mudar o que o Enter faz no prompt, mas os atalhos do Claude Code conseguem, então alternar edita o bloco `Chat` do `~/.claude/keybindings.json`:
+
+- **Ligar** acrescenta `"enter": "chat:newline"` e `"ctrl+enter": "chat:submit"`.
+- **Desligar** remove essas duas entradas, e só enquanto elas continuam iguais. O resto do arquivo fica como está.
+
+O Claude Code aplica a mudança na hora, e ela vale para todas as sessões, porque o arquivo é um só. Se o arquivo não for um JSON que o plugin consiga editar, ele não mexe e o `/rich` avisa.
+
+Alguns terminais mandam o Ctrl+Enter como um Enter comum. Nesses, acrescente você mesmo outra tecla de envio no bloco `Chat`, por exemplo `"ctrl+s": "chat:submit"`; desligar não mexe nela.
+
+### O atalho Alt+R
+
+Plugins não conseguem registrar teclas próprias. O botão `✎ Rich input` acima do prompt escuta a ação `app:toggleReplTab`, e você liga uma tecla a essa ação. Adicione isto ao `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
 
 ```json
 {
@@ -72,30 +83,26 @@ Plugins não conseguem mudar o que o Enter faz no prompt, mas os atalhos do Clau
   "$docs": "https://code.claude.com/docs/en/keybindings",
   "bindings": [
     {
-      "context": "Chat",
+      "context": "Global",
       "bindings": {
-        "enter": "chat:newline",
-        "ctrl+enter": "chat:submit",
-        "ctrl+s": "chat:submit"
+        "alt+r": "app:toggleReplTab"
       }
     }
   ]
 }
 ```
 
-- **Enter** insere uma linha nova. Com as sugestões do `@` abertas, o Enter continua escolhendo a sugestão destacada.
-- **Ctrl+Enter** envia. Alguns terminais mandam o Ctrl+Enter como um Enter comum; neles, use **Ctrl+S**.
+Se essa ação já estiver em uso no seu setup, escolha outra ação sem uso e configure na opção `toggleAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho só funciona enquanto a linha acima do prompt estiver visível (`showBand`, ligada por padrão).
 
-Isso muda o Enter em todas as sessões do Claude Code. Para voltar ao normal, remova o bloco `Chat`.
-
-Vindo da 0.4: o painel do editor não existe mais, então os atalhos `app:toggleReplTab` e `app:toggleDiffPreSession` que ele usava podem ser removidos.
+Vindo da 0.4: o painel do editor não existe mais. Mantenha o `alt+r`; o `app:toggleDiffPreSession` no contexto `PaneField` pode ser removido.
 
 ## Teclas
 
 | Tecla | Ação |
 | --- | --- |
-| `Enter` | Linha nova onde o cursor está (com sugestões do `@` abertas: escolhe a destacada) |
-| `Ctrl+Enter` / `Ctrl+S` | Envia o prompt |
+| `Alt+R` / `/rich` | Liga ou desliga o Rich Input |
+| `Enter` | Ligado: linha nova onde o cursor está (com sugestões do `@` abertas: escolhe a destacada). Desligado: envia |
+| `Ctrl+Enter` | Ligado: envia |
 | `←` `→` `↑` `↓` `Home` `End` | Movem o cursor |
 | `Backspace` no começo de uma linha | Junta com a linha de cima |
 | `@` | Completa arquivos e pastas; escolher uma pasta lista o conteúdo dela |
@@ -104,16 +111,17 @@ Vindo da 0.4: o painel do editor não existe mais, então os atalhos `app:toggle
 
 ```
 plugins/rich-input/
-├── .claude-plugin/plugin.json   manifesto e a opção showHint
+├── .claude-plugin/plugin.json   manifesto e opções (toggleAction, showBand)
 ├── hooks/
 │   ├── hooks.json               aponta o Claude Code para o register.tsx
-│   ├── register.tsx             /rich, a dica acima do prompt, as sugestões do @, o índice do projeto
+│   ├── register.tsx             /rich, a linha acima do prompt, o rótulo no rodapé, o rascunho azul, as sugestões do @
+│   ├── bindings.ts              liga e desliga os atalhos do bloco Chat no keybindings.json
 │   └── complete.ts              autocomplete do @: navegação por pasta, busca aproximada, linhas do typeahead
-├── types/index.d.ts             tipos compartilhados
-└── tests/rich-input.test.ts     testes (claude plugin test)
+├── types/index.d.ts             tipos compartilhados e o contrato de estado do plugin
+└── tests/rich-input.test.tsx    testes (claude plugin test)
 ```
 
-O `register.tsx` usa o hook `prompt.autocomplete` para as palavras que começam com `@`. Ele acrescenta linhas ao typeahead do prompt a partir de um índice do projeto que guarda por 15 segundos. A linha de uma pasta escreve `@pasta/` e deixa o cursor dentro da menção, então o Claude Code pergunta de novo e o conteúdo da pasta aparece. A edição multi-linha em si é o prompt do Claude Code com os atalhos acima.
+O `register.tsx` lê o `keybindings.json` quando a sessão começa e guarda no estado do plugin se o Rich Input está ligado. O `/rich` e o botão reescrevem o arquivo por meio do `bindings.ts`. Enquanto está ligado, um hook `prompt.edit` pinta o rascunho e a lista de modos do rodapé ganha `rich input`. Um hook `prompt.autocomplete` acrescenta as sugestões do `@` a partir de um índice do projeto guardado por 15 segundos; a linha de uma pasta deixa o cursor dentro da menção, então o Claude Code pergunta de novo e o conteúdo da pasta aparece.
 
 As versões anteriores (até a 0.4) desenhavam um editor próprio num painel. Lá o painel só oferece campos de uma linha, então não dava para ter cursor livre nem juntar linhas com Backspace; o prompt tem tudo isso.
 
@@ -122,7 +130,7 @@ As versões anteriores (até a 0.4) desenhavam um editor próprio num painel. L�
 ```bash
 cd plugins/rich-input
 claude plugin validate .   # confere o manifesto e o módulo de hooks
-claude plugin test .       # roda tests/*.test.ts
+claude plugin test .       # roda tests/*.test.tsx
 ```
 
 Depois que o Claude Code carrega o plugin do disco, ele grava os tipos da API em `.claude-plugin/types/` (ignorado pelo git). A partir daí, `npx -p typescript tsc -p plugins/rich-input` faz a checagem de tipos.

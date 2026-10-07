@@ -18,10 +18,16 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
-    "showHint": {
+    "toggleAction": {
+      "type": "string",
+      "title": "Keybinding action that turns rich input on or off",
+      "description": "Engine action (keybindings.json) whose shortcut presses the '✎ Rich input' button above the prompt. Bind a key to it in the Global context of ~/.claude/keybindings.json.",
+      "default": "app:toggleReplTab"
+    },
+    "showBand": {
       "type": "boolean",
-      "title": "Show the key hint above the prompt",
-      "description": "Draws '✎ Enter new line · Ctrl+Enter send · @ browses folders' above the prompt.",
+      "title": "Show the row above the prompt",
+      "description": "Draws the '✎ Rich input: on/off' row above the prompt (required for the keyboard shortcut to work).",
       "default": true
     }
   }
