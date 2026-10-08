@@ -1,7 +1,7 @@
 {
   "name": "rich-input",
-  "version": "0.5.0",
-  "description": "Warp-style Rich Input for Claude Code: the prompt box as a multi-line editor (Enter for a new line, Ctrl+Enter to send) with @ completion that browses folder by folder",
+  "version": "0.6.0",
+  "description": "Warp-style Rich Input for Claude Code: the prompt box as a multi-line editor you switch on and off (Enter for a new line, Ctrl+Enter to send), an editor pane for mouse-capable terminals, and @ completion that browses folder by folder",
   "author": {
     "name": "Higor César",
     "url": "https://github.com/higorcesarqn"
