@@ -13,6 +13,7 @@ O Claude Code já tem o `Ctrl+G`, que abre o prompt no seu `$EDITOR`. Mas no edi
 - **O prompt é o editor.** O cursor anda livre: setas, Home/End, Enter no meio de uma linha divide a linha, Backspace no começo de uma linha junta com a de cima. Colar, imagens e o histórico de prompts funcionam como sempre, porque é o prompt do próprio Claude Code.
 - **Liga e desliga com uma tecla:** `Alt+R` ou `/rich`. Desligado, o Enter envia como sempre.
 - **Dá para ver quando está ligado:** o texto que você digita fica azul, `rich input` aparece no rodapé abaixo do prompt e a linha acima do prompt diz `✎ Rich input: on`.
+- **Um editor em painel (`Alt+E` ou `/rich pane`)** para terminais que repassam o clique do mouse ao Claude Code: um editor com cursor livre ao lado da conversa, com menu de `@` próprio, clique direito para colar e `Ctrl+S` para pôr o texto no prompt. Veja [Editor em painel](#editor-em-painel).
 - **Autocomplete de `@` que navega pelas pastas:**
   - `@` lista a raiz do projeto.
   - As sugestões do plugin aparecem embaixo das sugestões do próprio prompt. Ao escolher uma pasta (`@src/`), a menção continua aberta e o conteúdo da pasta aparece, então você vai de `@src/` → `@src/lib/` → arquivo.
@@ -73,9 +74,9 @@ O Claude Code aplica a mudança na hora, e ela vale para todas as sessões, porq
 
 Alguns terminais mandam o Ctrl+Enter como um Enter comum. Nesses, acrescente você mesmo outra tecla de envio no bloco `Chat`, por exemplo `"ctrl+s": "chat:submit"`; desligar não mexe nela.
 
-### O atalho Alt+R
+### Os atalhos Alt+R e Alt+E
 
-Plugins não conseguem registrar teclas próprias. O botão `✎ Rich input` acima do prompt escuta a ação `app:toggleReplTab`, e você liga uma tecla a essa ação. Adicione isto ao `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
+Plugins não conseguem registrar teclas próprias. Os botões acima do prompt escutam ações de atalho, e você liga teclas a essas ações: o `✎ Rich input` escuta `app:toggleReplTab`, o `▤ Editor` escuta `app:toggleDiffPreSession`. Adicione isto ao `~/.claude/keybindings.json` (crie o arquivo se ele não existir):
 
 ```json
 {
@@ -85,22 +86,35 @@ Plugins não conseguem registrar teclas próprias. O botão `✎ Rich input` aci
     {
       "context": "Global",
       "bindings": {
-        "alt+r": "app:toggleReplTab"
+        "alt+r": "app:toggleReplTab",
+        "alt+e": "app:toggleDiffPreSession"
       }
     }
   ]
 }
 ```
 
-Se essa ação já estiver em uso no seu setup, escolha outra ação sem uso e configure na opção `toggleAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). O atalho só funciona enquanto a linha acima do prompt estiver visível (`showBand`, ligada por padrão).
+Se alguma dessas ações já estiver em uso no seu setup, escolha outra ação sem uso e configure na opção `toggleAction` ou `paneAction` do plugin (`/plugin configure rich-input@rich-input-editor`, ou `/config`). Os atalhos só funcionam enquanto a linha acima do prompt estiver visível (`showBand`, ligada por padrão).
 
-Vindo da 0.4: o painel do editor não existe mais. Mantenha o `alt+r`; o `app:toggleDiffPreSession` no contexto `PaneField` pode ser removido.
+Vindo da 0.4: mantenha o `alt+r` e remova o `ctrl+s` → `app:toggleDiffPreSession` do contexto `PaneField`, senão ele aperta o `▤ Editor`.
+
+## Editor em painel
+
+`Alt+E` (ou `/rich pane`) abre um editor ao lado da conversa, levando para ele o que estiver no prompt. Ele precisa de um terminal que repasse o clique do mouse ao Claude Code: o painel só recebe o teclado depois de um clique, e nenhum plugin consegue pular isso. Até lá, a primeira linha dele diz `▶ Click here to start typing`.
+
+- Digite em qualquer lugar: setas, Home/End, um clique no texto leva o cursor até ali, Enter divide a linha, Backspace no começo de uma linha junta com a de cima, Delete junta com a de baixo.
+- `@` abre um menu de arquivos e pastas embaixo da linha; as setas escolhem, Enter ou Tab aceitam, e uma pasta lista o conteúdo em seguida.
+- **Clique direito cola** a área de transferência. O Ctrl+V não chega ao painel, então o plugin lê a área de transferência por conta própria (`powershell Get-Clipboard` no Windows, `pbpaste`, `wl-paste` ou `xclip` nos outros).
+- **Ctrl+S** fecha o painel e põe o texto no prompt; aperte Enter lá para enviar, assim as referências `@` são resolvidas.
+- `Esc` devolve o teclado ao Claude Code sem fechar o painel; um clique volta para ele. `Alt+E` de novo (ou o fechar do painel) fecha e devolve o rascunho ao prompt.
+- Ele fica à direita com o layout de tela cheia do Claude Code e pelo menos 110 colunas; fora disso, abre acima do prompt.
 
 ## Teclas
 
 | Tecla | Ação |
 | --- | --- |
 | `Alt+R` / `/rich` | Liga ou desliga o Rich Input |
+| `Alt+E` / `/rich pane` | Abre ou fecha o editor em painel |
 | `Enter` | Ligado: linha nova onde o cursor está (com sugestões do `@` abertas: escolhe a destacada). Desligado: envia |
 | `Ctrl+Enter` | Ligado: envia |
 | `←` `→` `↑` `↓` `Home` `End` | Movem o cursor |
@@ -111,10 +125,12 @@ Vindo da 0.4: o painel do editor não existe mais. Mantenha o `alt+r`; o `app:to
 
 ```
 plugins/rich-input/
-├── .claude-plugin/plugin.json   manifesto e opções (toggleAction, showBand)
+├── .claude-plugin/plugin.json   manifesto e opções (toggleAction, paneAction, showBand)
 ├── hooks/
 │   ├── hooks.json               aponta o Claude Code para o register.tsx
-│   ├── register.tsx             /rich, a linha acima do prompt, o rótulo no rodapé, o rascunho azul, as sugestões do @
+│   ├── register.tsx             /rich, a linha acima do prompt, o rótulo no rodapé, o rascunho azul, as sugestões do @, o editor em painel
+│   ├── editor.tsx               o editor em painel: desenha o texto e o cursor, recebe teclas e cliques
+│   ├── editor-core.ts           as edições, os movimentos do cursor, o menu do @ e a rolagem do editor em painel
 │   ├── bindings.ts              liga e desliga os atalhos do bloco Chat no keybindings.json
 │   └── complete.ts              autocomplete do @: navegação por pasta, busca aproximada, linhas do typeahead
 ├── types/index.d.ts             tipos compartilhados e o contrato de estado do plugin
@@ -123,7 +139,7 @@ plugins/rich-input/
 
 O `register.tsx` lê o `keybindings.json` quando a sessão começa e guarda no estado do plugin se o Rich Input está ligado. O `/rich` e o botão reescrevem o arquivo por meio do `bindings.ts`. Enquanto está ligado, um hook `prompt.edit` pinta o rascunho e a lista de modos do rodapé ganha `rich input`. Um hook `prompt.autocomplete` acrescenta as sugestões do `@` a partir de um índice do projeto guardado por 15 segundos; a linha de uma pasta deixa o cursor dentro da menção, então o Claude Code pergunta de novo e o conteúdo da pasta aparece.
 
-As versões anteriores (até a 0.4) desenhavam um editor próprio num painel. Lá o painel só oferece campos de uma linha, então não dava para ter cursor livre nem juntar linhas com Backspace; o prompt tem tudo isso.
+O editor em painel é um módulo de superfície `Client` (`editor.tsx`) que recebe teclas e cliques depois do primeiro clique. Ele manda ao `register.tsx` o rascunho, a busca de `@` que precisa e os pedidos de colar e enviar, e o `register.tsx` responde pelas props do painel: sugestões do mesmo índice, o texto da área de transferência e, ao enviar, o prompt.
 
 ## Desenvolvimento
 

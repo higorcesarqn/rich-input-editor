@@ -24,6 +24,12 @@
       "description": "Engine action (keybindings.json) whose shortcut presses the '✎ Rich input' button above the prompt. Bind a key to it in the Global context of ~/.claude/keybindings.json.",
       "default": "app:toggleReplTab"
     },
+    "paneAction": {
+      "type": "string",
+      "title": "Keybinding action that opens the editor pane",
+      "description": "Engine action (keybindings.json) whose shortcut presses the '▤ Editor' button above the prompt. Bind a key to it in the Global context of ~/.claude/keybindings.json.",
+      "default": "app:toggleDiffPreSession"
+    },
     "showBand": {
       "type": "boolean",
       "title": "Show the row above the prompt",

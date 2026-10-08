@@ -4,6 +4,7 @@ import type { On, PromptAutocompleteInput, PromptAutocompleteResult, PromptEditI
 
 import { isOn, parse, withRich } from '../hooks/bindings'
 import { complete, rows, withDirs } from '../hooks/complete'
+import { type Ed, fresh, layout, press, scrolled, textOf, withMenu } from '../hooks/editor-core'
 
 const FILES = ['src/app.ts', 'src/lib/parse.ts', 'src/lib/print.ts', 'docs/my notes.md', 'README.md']
 const ENTRIES = withDirs(FILES)
@@ -152,4 +153,118 @@ test('while on, the draft takes a color and the footer names the mode', async ($
 
   await $.ui.mount({ plugin: 'rich-input', surface: 'terminal', component: 'SessionMode', requestId: 'mode', props: { modes: ['focus'] } } as never)
   expect(footers.at(-1)).toEqual(['focus', 'rich input'])
+})
+
+const keys = (ed: Ed, ...ks: (string | { key: string; ctrl?: true })[]) =>
+  ks.reduce((e, k) => press(e, typeof k === 'string' ? { key: k } : k), ed)
+const type = (ed: Ed, text: string) => keys(ed, ...[...text])
+
+test('the editor: Enter splits a line at the cursor, Backspace at a line start joins it back', () => {
+  let ed = type(fresh(''), 'helloworld')
+  ed = keys(ed, 'left', 'left', 'left', 'left', 'left', 'return')
+  expect(ed.lines).toEqual(['hello', 'world'])
+  expect([ed.row, ed.col]).toEqual([1, 0])
+  ed = keys(ed, 'backspace')
+  expect(textOf(ed)).toBe('helloworld')
+  expect([ed.row, ed.col]).toEqual([0, 5])
+})
+
+test('the editor: arrows, Home, End and Delete move and edit across lines', () => {
+  let ed = fresh('abc\nde')
+  ed = keys(ed, 'up', 'home', 'right', 'delete')
+  expect(textOf(ed)).toBe('ac\nde')
+  ed = keys(ed, 'end', 'delete')
+  expect(textOf(ed)).toBe('acde')
+  ed = keys(ed, 'down', 'end', 'right')
+  expect([ed.row, ed.col]).toEqual([0, 4])
+})
+
+test('the editor: an @ mention asks for completions; a folder taken keeps it open', () => {
+  let ed = type(fresh(''), 'see @sr')
+  expect([ed.query, ed.queryId]).toEqual(['sr', 3])
+  ed = withMenu(ed, { queryId: ed.queryId, items: complete(ENTRIES, 'sr') })
+  expect(ed.menu?.items[0]?.label).toBe('src/')
+  ed = keys(ed, 'return')
+  expect(textOf(ed)).toBe('see @src/')
+  expect(ed.query).toBe('src/')
+  ed = withMenu(ed, { queryId: ed.queryId, items: complete(ENTRIES, 'src/') })
+  ed = keys(ed, 'down', 'tab')
+  expect(textOf(ed)).toBe('see @src/app.ts ')
+  expect(ed.menu).toBeNull()
+})
+
+test('the editor: an answer for an older query is ignored; Ctrl+S asks to send', () => {
+  let ed = type(fresh(''), '@s')
+  const old = ed.queryId
+  ed = type(ed, 'r')
+  expect(withMenu(ed, { queryId: old, items: complete(ENTRIES, 's') }).menu).toBeNull()
+  expect(keys(ed, { key: 's', ctrl: true }).send).toBe(1)
+})
+
+test('the editor scrolls to keep the cursor and its menu in view', () => {
+  const ed = scrolled(fresh('1\n2\n3\n4\n5\n6'), 3)
+  expect(ed.top).toBe(3)
+  expect(layout(ed, 3)).toEqual([
+    { kind: 'line', row: 3 },
+    { kind: 'line', row: 4 },
+    { kind: 'line', row: 5 },
+  ])
+})
+
+const PANE = {
+  plugin: 'rich-input',
+  surface: 'terminal',
+  component: 'Pane',
+  requestId: 'rich-input-pane',
+  props: {
+    title: 'Rich Input',
+    isFocused: true,
+    bodyColumns: 60,
+    placement: 'dock',
+    scroll: { offset: 0, bodyRows: 12 },
+    view: {},
+  },
+  viewport: { columns: 120, rows: 30 },
+} as const
+
+test('the pane editor: type, complete @, paste with a right click, Ctrl+S puts it all in the prompt', async ($, on) => {
+  const filled: string[] = []
+  mock.clock(on)
+  on('session.cwd', () => ({ value: '/proj' }))
+  on('process.run', (_$, e) => ({
+    value: {
+      exitCode: 0,
+      stdout: e.argv[0] === 'git' ? FILES.join('\0') : 'one\r\ntwo\r\n',
+      stderr: '',
+      isStdoutTruncated: false,
+      isStderrTruncated: false,
+    },
+  }))
+  on('prompt.read', () => ({ value: { text: 'draft', cursor: 5 } }))
+  on('prompt.fill', (_$, e) => {
+    filled.push(e.text)
+    return { isFilled: true, text: e.text, cursor: e.text.length }
+  })
+  on('ui.panes', () => ({ value: [] }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+
+  await $.command.run({ command: 'rich', args: 'pane', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+  expect(filled).toEqual([''])
+  const ui = await $.ui.mount(PANE)
+  await ui.resize({ columns: 60, rows: 10, in: 'editor' })
+  expect(await ui.find({ text: /Click here to start typing/, in: 'editor' })).toBeDefined()
+  await ui.pointer({ type: 'down', x: 20, y: 1, button: 'left', in: 'editor' })
+  expect(await ui.find({ text: /editing/, in: 'editor' })).toBeDefined()
+
+  for (const k of [...' @sr']) await ui.key({ key: k, in: 'editor' })
+  expect(await ui.find({ text: /^\s*src\/$/, in: 'editor' })).toBeDefined()
+  await ui.key({ key: 'return', in: 'editor' })
+  await ui.key({ key: 'return', in: 'editor' })
+  await ui.key({ key: 'return', in: 'editor' })
+
+  await ui.pointer({ type: 'down', x: 5, y: 0, button: 'right', in: 'editor' })
+  await ui.key({ key: 's', ctrl: true, in: 'editor' })
+  expect(filled.at(-1)).toBe('draft @src/lib/parse.ts one\ntwo')
 })
